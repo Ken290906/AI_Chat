@@ -1,30 +1,57 @@
-<script setup>
-import HelloWorld from './components/HelloWorld.vue'
-</script>
-
 <template>
-  <div>
-    <a href="https://vite.dev" target="_blank">
-      <img src="/vite.svg" class="logo" alt="Vite logo" />
-    </a>
-    <a href="https://vuejs.org/" target="_blank">
-      <img src="./assets/vue.svg" class="logo vue" alt="Vue logo" />
-    </a>
-  </div>
-  <HelloWorld msg="Vite + Vue" />
+  <router-view />
 </template>
 
-<style scoped>
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
+<script>
+import { RouterView } from 'vue-router'; // Import RouterView
+
+export default {
+  name: 'App',
+  components: {
+    RouterView // Register RouterView locally
+  }
 }
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
+</script>
+
+<style>
+/* Global styles for ZenChat */
+:root {
+  --primary-color: #4A55A2;
+  --accent-color: #C5DFF8;
+  --background-color: #F8F9FA;
+  --sidebar-bg: #FFFFFF;
+  --text-color: #343a40;
+  --border-color: #dee2e6;
 }
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #42b883aa);
+
+body {
+  margin: 0;
+  overflow: hidden; /* Prevent double scrollbars */
+  background-color: var(--background-color);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+#app {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--text-color);
+  width: 100%;
+  height: 100vh; /* Ensure app takes full viewport height */
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 8px;
+  border: 2px solid var(--background-color);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #aaa;
 }
 </style>
