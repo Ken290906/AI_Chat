@@ -38,10 +38,6 @@
             <h6 class="mb-0 fw-bold">Chưa xác thực</h6>
             <small class="text-muted">Online via Website</small>
           </div>
-          <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="aiSwitch" checked>
-            <label class="form-check-label" for="aiSwitch">Nhân viên AI</label>
-          </div>
         </div>
 
         <div class="chat-body flex-grow-1 p-4">

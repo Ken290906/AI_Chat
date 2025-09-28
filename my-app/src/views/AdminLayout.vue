@@ -1,18 +1,35 @@
+[file name]: AdminLayout.vue
+[file content begin]
 <template>
   <div id="app-layout" :class="{'sidebar-collapsed': !isSidebarOpen}">
     <Header @toggle-notifications="toggleToast" />
     <ToastNotification :show="showToast" @close="showToast = false" />
 
     <div class="main-content container-fluid">
-      <div class="row flex-nowrap"> <!-- Added flex-nowrap to prevent wrapping -->
-        <div class="col-auto p-0 sidebar-wrapper"> <!-- col-auto for sidebar -->
-          <Sidebar :isOpen="isSidebarOpen" @toggle-sidebar="toggleSidebar" />
+      <div class="row flex-nowrap">
+        <div class="col-auto p-0 sidebar-wrapper">
+          <Sidebar 
+            :isOpen="isSidebarOpen" 
+            :activeTab="activeTab"
+            @toggle-sidebar="toggleSidebar"
+            @selectTab="handleTabSelect" />
         </div>
-        <div class="col p-0"> <!-- col to take remaining space -->
-          <ChatPanel />
+        
+        <!-- Dashboard View - Chiếm toàn bộ không gian còn lại -->
+        <div v-if="activeTab === 'dashboard'" class="col p-0">
+          <Dashboard />
         </div>
-        <div class="col-lg-3 d-none d-lg-block p-0">
-          <InfoPanel />
+        
+        <!-- Chat View - Với InfoPanel bên cạnh -->
+        <div v-else class="col p-0">
+          <div class="row h-100">
+            <div class="col-md-9 p-0">
+              <ChatPanel />
+            </div>
+            <div class="col-md-3 d-none d-md-block p-0">
+              <InfoPanel />
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -25,6 +42,7 @@ import Sidebar from '../components/Sidebar.vue'
 import ChatPanel from '../components/ChatPanel.vue'
 import InfoPanel from '../components/InfoPanel.vue'
 import ToastNotification from '../components/ToastNotification.vue'
+import Dashboard from '../components/Dashboard.vue'
 
 export default {
   name: 'AdminLayout',
@@ -33,12 +51,14 @@ export default {
     Sidebar,
     ChatPanel,
     InfoPanel,
-    ToastNotification
+    ToastNotification,
+    Dashboard
   },
   data() {
     return {
       showToast: false,
-      isSidebarOpen: true // New state for sidebar
+      isSidebarOpen: true,
+      activeTab: 'chat' // Mặc định hiển thị chat
     }
   },
   methods: {
@@ -47,11 +67,14 @@ export default {
       if (this.showToast) {
         setTimeout(() => {
           this.showToast = false;
-        }, 5000); // Auto-hide after 5 seconds
+        }, 5000);
       }
     },
-    toggleSidebar() { // New method to toggle sidebar
+    toggleSidebar() {
       this.isSidebarOpen = !this.isSidebarOpen;
+    },
+    handleTabSelect(tab) {
+      this.activeTab = tab;
     }
   }
 }
@@ -81,22 +104,31 @@ body {
 }
 
 .main-content, .main-content .row {
-  height: calc(100vh - 61px); /* Adjusted for new header height */
+  height: calc(100vh - 61px);
 }
 
 .sidebar-wrapper {
-  transition: width 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Increased duration to 1.2s */
-  width: 200px; /* Default expanded width */
-  flex-shrink: 0; /* Prevent shrinking */
+  transition: width 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  width: 200px;
+  flex-shrink: 0;
 }
 
 #app-layout.sidebar-collapsed .sidebar-wrapper {
-  width: 60px; /* Collapsed width */
+  width: 60px;
 }
 
 .main-content .row > div {
   height: 100%;
   overflow-y: auto;
+}
+
+/* Đảm bảo các phần tử con chiếm toàn bộ chiều cao */
+.main-content .row.h-100 {
+  margin: 0;
+}
+
+.main-content .row.h-100 > div {
+  height: 100%;
 }
 
 /* Custom scrollbar */
@@ -115,3 +147,4 @@ body {
   background: #aaa;
 }
 </style>
+[file content end]

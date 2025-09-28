@@ -1,3 +1,5 @@
+[file name]: Sidebar.vue
+[file content begin]
 <template>
   <div :class="['sidebar', 'd-flex', 'flex-column', 'p-3', {'collapsed': !isOpen}]">
     <div class="dropdown mb-3">
@@ -22,7 +24,9 @@
     <hr>
     <ul class="nav nav-pills flex-column mb-auto">
       <li class="nav-item">
-        <a href="#" :class="['nav-link', {'justify-content-center': !isOpen}]">
+        <a href="#" 
+          :class="['nav-link', {'justify-content-center': !isOpen, 'active': activeTab === 'dashboard'}]" 
+          @click.prevent="setActiveTab('dashboard')">
           <i class="bi bi-view-stacked me-2"></i>
           <transition name="fade-slide">
             <span v-show="isOpen">Tổng quan</span>
@@ -30,7 +34,9 @@
         </a>
       </li>
       <li>
-        <a href="#" :class="['nav-link', {'justify-content-center': !isOpen}]">
+        <a href="#" 
+          :class="['nav-link', {'justify-content-center': !isOpen, 'active': activeTab === 'list'}]"
+          @click.prevent="setActiveTab('list')">
           <i class="bi bi-people me-2"></i>
           <transition name="fade-slide">
             <span v-show="isOpen">Danh sách</span>
@@ -38,7 +44,9 @@
         </a>
       </li>
       <li>
-        <a href="#" :class="['nav-link', 'active', {'justify-content-center': !isOpen}]">
+        <a href="#" 
+          :class="['nav-link', {'justify-content-center': !isOpen, 'active': activeTab === 'chat'}]"
+          @click.prevent="setActiveTab('chat')">
           <i class="bi bi-chat-quote me-2"></i>
           <transition name="fade-slide">
             <span v-show="isOpen">Hội thoại</span>
@@ -49,7 +57,9 @@
         </a>
       </li>
       <li>
-        <a href="#" :class="['nav-link', {'justify-content-center': !isOpen}]">
+        <a href="#" 
+          :class="['nav-link', {'justify-content-center': !isOpen, 'active': activeTab === 'orders'}]"
+          @click.prevent="setActiveTab('orders')">
           <i class="bi bi-receipt-cutoff me-2"></i>
           <transition name="fade-slide">
             <span v-show="isOpen">Đơn hàng</span>
@@ -57,7 +67,9 @@
         </a>
       </li>
       <li>
-        <a href="#" :class="['nav-link', {'justify-content-center': !isOpen}]">
+        <a href="#" 
+          :class="['nav-link', {'justify-content-center': !isOpen, 'active': activeTab === 'settings'}]"
+          @click.prevent="setActiveTab('settings')">
           <i class="bi bi-gear me-2"></i>
           <transition name="fade-slide">
             <span v-show="isOpen">Thiết lập</span>
@@ -84,13 +96,21 @@ export default {
     isOpen: {
       type: Boolean,
       default: true
+    },
+    activeTab: {
+      type: String,
+      default: 'chat' // Mặc định là chat
     }
   },
   methods: {
     handleToggleSidebar(event) {
-      event.preventDefault(); // Explicitly prevent default behavior
-      console.log('Sidebar: Toggling sidebar'); // Debug log
+      event.preventDefault();
+      console.log('Sidebar: Toggling sidebar');
       this.$emit('toggle-sidebar');
+    },
+    setActiveTab(tab) {
+      console.log('Sidebar: Setting active tab to', tab);
+      this.$emit('selectTab', tab);
     }
   }
 }
@@ -189,3 +209,4 @@ hr {
   transform: translateX(-10px);
 }
 </style>
+[file content end]
