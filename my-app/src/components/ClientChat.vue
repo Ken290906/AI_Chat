@@ -5,13 +5,19 @@
       <img src="https://i.pravatar.cc/40?u=at" class="rounded-circle me-3" alt="AT">
       <div>
         <h6 class="mb-0 fw-bold">AT</h6>
-        <small class="text-muted">Nhân viên bán hàng</small>
+        <small class="text-muted">
+          {{ isAdminChat ? 'Nhân viên hỗ trợ' : 'Trợ lý AI (Gemma3)' }}
+        </small>
       </div>
     </div>
 
     <!-- Chat Body -->
     <div class="chat-body flex-grow-1 p-3 overflow-auto">
-      <div v-for="(message, index) in messages" :key="index" :class="['mb-3', message.isUser ? 'd-flex justify-content-end' : 'd-flex justify-content-start']">
+      <div
+        v-for="(message, index) in messages"
+        :key="index"
+        :class="['mb-3', message.isUser ? 'd-flex justify-content-end' : 'd-flex justify-content-start']"
+      >
         <!-- Agent Message -->
         <template v-if="!message.isUser">
           <img src="https://i.pravatar.cc/32?u=agent" class="rounded-circle me-2 agent-avatar" alt="Agent">
@@ -19,18 +25,15 @@
             <div class="message-bubble agent-message">
               <VueMarkdown :source="message.text" />
             </div>
-            <div class="text-muted small mt-1">
-              <i class="bi bi-arrow-clockwise"></i>
-            </div>
           </div>
         </template>
+
         <!-- User Message -->
-        <div v-else class="message-bubble user-message">
-          {{ message.text }}
-        </div>
+        <div v-else class="message-bubble user-message">{{ message.text }}</div>
       </div>
+
       <!-- Loading Effect -->
-      <div v-if="isTyping" class="d-flex justify-content-start mb-3 loading-message animate__animated animate__fadeIn">
+      <div v-if="isTyping && !isAdminChat" class="d-flex justify-content-start mb-3 loading-message animate__animated animate__fadeIn">
         <img src="https://i.pravatar.cc/32?u=agent" class="rounded-circle me-2 agent-avatar" alt="Agent">
         <div class="message-content">
           <div class="message-bubble agent-message d-flex align-items-center">
@@ -41,7 +44,7 @@
       </div>
     </div>
 
-    <!-- Chat Footer (Input Area) -->
+    <!-- Chat Footer -->
     <div class="chat-footer p-3 border-top">
       <div class="input-group">
         <button class="btn btn-outline-secondary border-0" type="button"><i class="bi bi-plus-lg"></i></button>
@@ -53,64 +56,96 @@
           placeholder="Nhập câu hỏi của bạn tại đây..."
         >
         <button class="btn btn-outline-secondary border-0" type="button"><i class="bi bi-mic-fill"></i></button>
-        <button class="btn btn-outline-secondary border-0" type="button"><i class="bi bi-google"></i></button>
+        <button class="btn btn-outline-secondary border-0" type="button"><i class="bi bi-send-fill" @click="sendMessage"></i></button>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import axios from 'axios';
-import VueMarkdown from 'vue3-markdown-it';
+import axios from "axios";
+import VueMarkdown from "vue3-markdown-it";
 
 export default {
-  name: 'ClientChat',
-  components: {
-    VueMarkdown // Đăng ký component VueMarkdown
-  },
+  name: "ClientChat",
+  components: { VueMarkdown },
   data() {
     return {
+      ws: null,
+      clientId: Math.random().toString(36).substring(2, 9),
       messages: [
-        { text: 'hello', isUser: true },
-        { text: 'Dạ chào bạn ạ! Mình có thể hỗ trợ gì cho bạn hôm nay ạ?', isUser: false }
+        { text: "Xin chào! Mình có thể giúp gì cho bạn hôm nay?", isUser: false },
       ],
-      newMessage: '',
-      isTyping: false
+      newMessage: "",
+      isTyping: false,
+      isAdminChat: false, // false = AI mode, true = Admin mode
     };
   },
+  mounted() {
+    this.connectWebSocket();
+  },
   methods: {
+    connectWebSocket() {
+      this.ws = new WebSocket("ws://localhost:3000");
+
+      this.ws.onopen = () => {
+        this.ws.send(JSON.stringify({ type: "client_register", clientId: this.clientId }));
+      };
+
+      this.ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === "admin_message") {
+          this.messages.push({ text: data.message, isUser: false });
+        }
+      };
+    },
+
     async sendMessage() {
-      if (!this.newMessage.trim()) return; // Không gửi nếu input rỗng
+      if (!this.newMessage.trim()) return;
+      const text = this.newMessage.trim();
+      this.messages.push({ text, isUser: true });
+      this.newMessage = "";
 
-      // Thêm tin nhắn người dùng vào danh sách
-      this.messages.push({ text: this.newMessage, isUser: true });
-      const messageToSend = this.newMessage; // Lưu tin nhắn trước khi xóa
-      this.newMessage = ''; // Xóa input ngay lập tức sau khi lưu tin nhắn
-
-      // Tự động cuộn xuống dưới cùng
-      this.$nextTick(() => {
-        const chatBody = this.$el.querySelector('.chat-body');
-        chatBody.scrollTop = chatBody.scrollHeight;
-      });
-
-      this.isTyping = true; // Bật hiệu ứng loading
-
-      try {
-        // Gửi yêu cầu tới backend
-        const response = await axios.post('http://localhost:3000/api/chat', {
-          message: messageToSend
+      // Kiểm tra keyword chuyển chế độ
+      if (this.containsSupportKeyword(text)) {
+        this.isAdminChat = true;
+        this.ws.send(JSON.stringify({ type: "support_request", clientId: this.clientId }));
+        this.messages.push({
+          text: "📞 Hệ thống đang kết nối bạn với nhân viên hỗ trợ...",
+          isUser: false,
         });
+        return;
+      }
 
-        // Thêm phản hồi từ server vào danh sách tin nhắn
+      // Nếu đang chat với Admin
+      if (this.isAdminChat) {
+        this.ws.send(
+          JSON.stringify({
+            type: "client_message",
+            clientId: this.clientId,
+            message: text,
+          })
+        );
+        return;
+      }
+
+      // Mặc định chat với AI
+      this.isTyping = true;
+      try {
+        const response = await axios.post("http://localhost:3000/api/chat", { message: text });
         this.messages.push({ text: response.data.reply, isUser: false });
       } catch (error) {
-        console.error('Lỗi khi gửi tin nhắn:', error);
-        this.messages.push({ text: 'Đã có lỗi xảy ra, vui lòng thử lại!', isUser: false });
+        this.messages.push({ text: "❌ Lỗi khi gửi tin nhắn tới AI.", isUser: false });
       } finally {
-        this.isTyping = false; // Tắt hiệu ứng loading
+        this.isTyping = false;
       }
-    }
-  }
+    },
+
+    containsSupportKeyword(text) {
+      const keywords = ["hỗ trợ gấp", "liên hệ nhân viên", "gặp nhân viên", "cần hỗ trợ"];
+      return keywords.some((kw) => text.toLowerCase().includes(kw));
+    },
+  },
 };
 </script>
 
@@ -137,7 +172,7 @@ export default {
 }
 
 .user-message {
-  background-color: #e0f2f7; /* Light blue */
+  background-color: #e0f2f7;
   color: #333;
 }
 
@@ -157,10 +192,6 @@ export default {
 .chat-footer {
   background-color: white;
   padding: 20px;
-}
-
-.chat-footer .input-group {
-  max-width: none;
 }
 
 .chat-footer .input-group .form-control {
@@ -197,57 +228,5 @@ export default {
   to {
     transform: rotate(360deg);
   }
-}
-
-/* Fade-in Animation */
-.loading-message {
-  animation: fadeIn 0.5s ease-in;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Markdown Styling */
-:deep(.markdown-body) {
-  font-size: 14px;
-  line-height: 1.6;
-  color: #333;
-}
-
-:deep(.markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6) {
-  margin: 0.5em 0;
-  font-weight: bold;
-}
-
-:deep(.markdown-body ul, .markdown-body ol) {
-  padding-left: 20px;
-  margin: 0.5em 0;
-}
-
-:deep(.markdown-body code) {
-  background-color: #f1f3f4;
-  padding: 2px 4px;
-  border-radius: 4px;
-  font-family: 'Courier New', Courier, monospace;
-}
-
-:deep(.markdown-body pre) {
-  background-color: #f1f3f4;
-  padding: 10px;
-  border-radius: 8px;
-  overflow-x: auto;
-}
-
-:deep(.markdown-body pre code) {
-  background: none;
-  padding: 0;
 }
 </style>
