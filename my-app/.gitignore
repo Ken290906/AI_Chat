@@ -22,3 +22,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Node modules
+node_modules/
+backend/node_modules/
+
+# Lock files
+package-lock.json
+backend/package-lock.json
+
+# Logs & build
+*.log
+dist/

@@ -1,73 +1,74 @@
 <template>
-  <transition name="toast">
-    <div v-if="show" class="toast-container position-fixed top-0 end-0 p-3">
-      <div class="toast show" role="alert" aria-live="assertive" aria-atomic="true">
-        <div class="toast-header">
-          <i class="bi bi-flag-fill me-2 brand-icon"></i>
-          <strong class="me-auto">Thông báo</strong>
-          <small>vài giây trước</small>
-          <button type="button" class="btn-close" @click="close" aria-label="Close"></button>
-        </div>
+  <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100;">
+    <div
+      v-for="(toast, index) in toasts"
+      :key="index"
+      :class="['toast align-items-center text-white border-0 show', toast.type]"
+      role="alert"
+      aria-live="assertive"
+      aria-atomic="true"
+    >
+      <div class="d-flex">
         <div class="toast-body">
-          Khách hàng "Chưa xác định" tại cửa hàng Alosop cần hỗ trợ trực tiếp.
+          <strong>{{ toast.title }}</strong><br />
+          {{ toast.message }}
         </div>
+        <button
+          type="button"
+          class="btn-close btn-close-white me-2 m-auto"
+          @click="removeToast(index)"
+        ></button>
       </div>
     </div>
-  </transition>
+  </div>
 </template>
 
 <script>
 export default {
-  name: 'ToastNotification',
-  props: {
-    show: {
-      type: Boolean,
-      default: false
-    }
+  name: "ToastNotification",
+  data() {
+    return {
+      toasts: []
+    };
   },
   methods: {
-    close() {
-      this.$emit('close');
+    // ✅ Hàm show() để AdminLayout gọi qua this.$refs.toastRef.show()
+    show(message, type = "info", title = "Thông báo", duration = 5000) {
+      const toast = { title, message, type };
+      this.toasts.push(toast);
+      setTimeout(() => {
+        this.toasts.shift();
+      }, duration);
+    },
+    removeToast(index) {
+      this.toasts.splice(index, 1);
     }
   }
-}
+};
 </script>
 
 <style scoped>
-.toast-container {
-  z-index: 1055; /* Ensure it's above other content */
+.toast {
+  min-width: 280px;
+  margin-bottom: 12px;
+  border-radius: 0.75rem;
+  animation: fadeIn 0.4s ease;
 }
-.brand-icon {
-  color: #4A55A2; /* New primary color */
+.toast.warning {
+  background-color: #ffc107;
+  color: #000;
 }
-
-/* Toast Animation */
-.toast-enter-active {
-  animation: slide-in 0.5s ease-out;
+.toast.success {
+  background-color: #198754;
 }
-.toast-leave-active {
-  animation: slide-out 0.5s ease-in;
+.toast.info {
+  background-color: #0dcaf0;
 }
-
-@keyframes slide-in {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+.toast.error {
+  background-color: #dc3545;
 }
-
-@keyframes slide-out {
-  from {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateX(100%);
-    opacity: 0;
-  }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 </style>

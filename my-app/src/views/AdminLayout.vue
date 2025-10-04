@@ -3,7 +3,9 @@
 <template>
   <div id="app-layout" :class="{'sidebar-collapsed': !isSidebarOpen}">
     <Header @toggle-notifications="toggleToast" />
-    <ToastNotification :show="showToast" @close="showToast = false" />
+    <!-- <ToastNotification :show="showToast" @close="showToast = false" /> -->
+    <!-- ✅ Gán ref để gọi hàm show() trực tiếp -->
+    <ToastNotification ref="toastRef" :show="showToast" @close="showToast = false" />
 
     <div class="main-content container-fluid">
       <div class="row flex-nowrap">
@@ -24,7 +26,9 @@
         <div v-else class="col p-0">
           <div class="row h-100">
             <div class="col-md-9 p-0">
-              <ChatPanel />
+              <!-- <ChatPanel /> -->
+               <!-- ✅ Lắng nghe sự kiện support-request từ ChatPanel -->
+              <ChatPanel @support-request="handleSupportRequest" />
             </div>
             <div class="col-md-3 d-none d-md-block p-0">
               <InfoPanel />
@@ -75,6 +79,15 @@ export default {
     },
     handleTabSelect(tab) {
       this.activeTab = tab;
+    },
+
+    // ✅ HÀM MỚI: xử lý sự kiện support-request từ ChatPanel
+    handleSupportRequest(clientId) {
+      if (this.$refs.toastRef && this.$refs.toastRef.show) {
+        this.$refs.toastRef.show(`📢 Khách hàng ${clientId} cần hỗ trợ gấp!`);
+      } else {
+        console.warn('ToastNotification chưa sẵn sàng!');
+      }
     }
   }
 }
