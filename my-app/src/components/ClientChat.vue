@@ -12,7 +12,7 @@
     </div>
 
     <!-- Chat Body -->
-    <div class="chat-body flex-grow-1 p-3 overflow-auto">
+    <div class="chat-body flex-grow-1 p-3 overflow-auto" ref="chatBody">
       <div
         v-for="(message, index) in messages"
         :key="index"
@@ -53,10 +53,11 @@
           @keyup.enter="sendMessage"
           type="text"
           class="form-control border-0"
-          placeholder="Nhập câu hỏi của bạn tại đây..."
+          :placeholder="isAwaitingAdmin ? 'Đang chờ nhân viên hỗ trợ...' : 'Nhập câu hỏi của bạn tại đây...'"
+          :disabled="isAwaitingAdmin"
         >
         <button class="btn btn-outline-secondary border-0" type="button"><i class="bi bi-mic-fill"></i></button>
-        <button class="btn btn-outline-secondary border-0" type="button"><i class="bi bi-send-fill" @click="sendMessage"></i></button>
+        <button class="btn btn-outline-secondary border-0" type="button" @click="sendMessage" :disabled="isAwaitingAdmin"><i class="bi bi-send-fill"></i></button>
       </div>
     </div>
   </div>
@@ -64,27 +65,45 @@
 
 <script>
 import axios from "axios";
-import VueMarkdown from "vue3-markdown-it";
+import VueMarkdown from 'vue3-markdown-it'
 
 export default {
   name: "ClientChat",
-  components: { VueMarkdown },
+  components: {
+    VueMarkdown,
+  },
   data() {
     return {
       ws: null,
       clientId: Math.random().toString(36).substring(2, 9),
       messages: [
-        { text: "Xin chào! Mình có thể giúp gì cho bạn hôm nay?", isUser: false },
+        { text: "Xin chào! Mình có thể giúp gì cho bạn hôm nay?", isUser: false, id: 'initial' },
       ],
       newMessage: "",
       isTyping: false,
       isAdminChat: false, // false = AI mode, true = Admin mode
+      promptCount: 0, // Count user prompts to AI
+      isAwaitingAdmin: false, // True when waiting for admin to accept/decline
     };
+  },
+  watch: {
+    messages() {
+      this.$nextTick(() => {
+        this.scrollToBottom();
+      });
+    }
   },
   mounted() {
     this.connectWebSocket();
+    this.scrollToBottom();
   },
   methods: {
+    scrollToBottom() {
+      const chatBody = this.$refs.chatBody;
+      if (chatBody) {
+        chatBody.scrollTo({ top: chatBody.scrollHeight, behavior: 'smooth' });
+      }
+    },
     connectWebSocket() {
       this.ws = new WebSocket("ws://localhost:3000");
 
@@ -94,56 +113,99 @@ export default {
 
       this.ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        if (data.type === "admin_message") {
-          this.messages.push({ text: data.message, isUser: false });
+        const connectingMsgIndex = this.messages.findIndex(
+          (msg) => msg.id === 'connecting_message'
+        );
+
+        if (data.type === "agent_accepted") {
+          this.isAwaitingAdmin = false;
+          this.isAdminChat = true; // Officially in admin chat
+          if (connectingMsgIndex !== -1) {
+            this.messages.splice(connectingMsgIndex, 1, {
+              text: "✅ Nhân viên đã kết nối. Bạn có thể bắt đầu cuộc trò chuyện!",
+              isUser: false,
+              id: 'connected_confirmation'
+            });
+          }
+        } else if (data.type === "agent_declined") {
+          this.isAwaitingAdmin = false;
+          if (connectingMsgIndex !== -1) {
+            this.messages.splice(connectingMsgIndex, 1, {
+              text: data.message, // "Sorry, all agents are busy..."
+              isUser: false,
+              id: 'declined_confirmation'
+            });
+          }
+          this.isAdminChat = false; // Revert to AI chat mode
+          this.promptCount = 0; // Reset counter
+        } else if (data.type === "admin_message") {
+          this.messages.push({ text: data.message.trim(), isUser: false });
         }
       };
     },
 
+    requestSupport(reason) {
+      this.isAdminChat = true; // Tentatively switch to admin mode
+      this.isAwaitingAdmin = true;
+      this.ws.send(JSON.stringify({ type: "support_request", clientId: this.clientId }));
+      this.messages.push({
+        text: reason,
+        isUser: false,
+        id: 'connecting_message',
+      });
+    },
+
     async sendMessage() {
-      if (!this.newMessage.trim()) return;
+      if (!this.newMessage.trim() || this.isAwaitingAdmin) return;
       const text = this.newMessage.trim();
       this.messages.push({ text, isUser: true });
       this.newMessage = "";
 
-      // Kiểm tra keyword chuyển chế độ
-      if (this.containsSupportKeyword(text)) {
-        this.isAdminChat = true;
-        this.ws.send(JSON.stringify({ type: "support_request", clientId: this.clientId }));
-        this.messages.push({
-          text: "📞 Hệ thống đang kết nối bạn với nhân viên hỗ trợ...",
-          isUser: false,
-        });
-        return;
-      }
-
-      // Nếu đang chat với Admin
+      // Handle admin chat logic first
       if (this.isAdminChat) {
-        this.ws.send(
-          JSON.stringify({
-            type: "client_message",
-            clientId: this.clientId,
-            message: text,
-          })
-        );
+        if (text.toLowerCase() === 'gemma') {
+          this.isAdminChat = false;
+          this.isAwaitingAdmin = false;
+          this.promptCount = 0; // Reset counter
+          this.messages.push({
+            text: "🤖 Đã chuyển về chế độ chat với Trợ lý AI.",
+            isUser: false,
+            id: 'switched_to_ai'
+          });
+          return;
+        }
+        this.ws.send(JSON.stringify({ type: "client_message", clientId: this.clientId, message: text }));
         return;
       }
 
-      // Mặc định chat với AI
+      // Handle AI chat logic
+      this.promptCount++;
+
+      if (this.promptCount >= 3) {
+        this.requestSupport("⚠️ AI đã gặp lỗi sau 3 lần thử. Hệ thống đang kết nối bạn với nhân viên hỗ trợ...");
+        return;
+      }
+
+      if (this.containsSupportKeyword(text)) {
+        this.requestSupport("📞 Hệ thống đang kết nối bạn với nhân viên hỗ trợ...");
+        return;
+      }
+
       this.isTyping = true;
       try {
         const response = await axios.post("http://localhost:3000/api/chat", { message: text });
         this.messages.push({ text: response.data.reply, isUser: false });
       } catch (error) {
         this.messages.push({ text: "❌ Lỗi khi gửi tin nhắn tới AI.", isUser: false });
+        // Trigger support request on AI error
+        this.requestSupport("☠️ AI đang gặp sự cố kỹ thuật. Hệ thống đang kết nối bạn với nhân viên hỗ trợ...");
       } finally {
         this.isTyping = false;
       }
     },
 
     containsSupportKeyword(text) {
-      const keywords = ["hỗ trợ gấp", "liên hệ nhân viên", "gặp nhân viên", "cần hỗ trợ"];
-      return keywords.some((kw) => text.toLowerCase().includes(kw));
+      return text.toLowerCase().includes("nhân viên hỗ trợ");
     },
   },
 };
@@ -167,7 +229,7 @@ export default {
 .message-bubble {
   padding: 10px 15px;
   border-radius: 1rem;
-  max-width: 75%;
+  max-width: 100%;
   word-wrap: break-word;
 }
 

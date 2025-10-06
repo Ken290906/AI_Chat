@@ -24,21 +24,26 @@
             href="#"
             class="list-group-item list-group-item-action"
             :class="{ active: activeClient && activeClient.id === client.id }"
-            @click.prevent="selectClient(client)"
+            @click.prevent="!client.hasRequest && selectClient(client)"
           >
-            <div class="d-flex w-100 justify-content-between">
-              <h6 class="mb-1">{{ client.id || 'Khách mới' }}</h6>
-              <small class="text-muted">online</small>
+            <div v-if="!client.hasRequest">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">{{ client.id || 'Khách mới' }}</h6>
+                <small class="text-muted">online</small>
+              </div>
+              <p class="mb-1 small text-muted">
+                {{ getLastMessage(client.id) || 'Chưa có tin nhắn' }}
+              </p>
             </div>
-            <p class="mb-1 small text-muted">
-              {{ getLastMessage(client.id) || 'Chưa có tin nhắn' }}
-            </p>
-            <div>
-              <span
-                v-if="client.hasRequest"
-                class="badge rounded-pill bg-warning-subtle text-warning-emphasis"
-              >Yêu cầu hỗ trợ</span>
-              <span class="badge rounded-pill bg-success-subtle text-success-emphasis">Khách mới</span>
+
+            <!-- Support Request Actions -->
+            <div v-if="client.hasRequest" class="support-request-actions">
+              <h6 class="mb-1 fw-bold">{{ client.id || 'Khách mới' }}</h6>
+              <p class="mb-2 small text-danger-emphasis">🚨 Cần hỗ trợ gấp!</p>
+              <div class="d-flex justify-content-around">
+                <button class="btn btn-sm btn-success" @click.stop="acceptRequest(client)">Đồng ý</button>
+                <button class="btn btn-sm btn-secondary" @click.stop="declineRequest(client)">Từ chối</button>
+              </div>
             </div>
           </a>
         </div>
@@ -91,7 +96,7 @@
         </div>
 
         <!-- Input -->
-        <div class="chat-footer p-3">
+        <div class="chat-footer">
           <div class="input-group">
             <button class="btn btn-outline-secondary border-0" type="button">
               <i class="bi bi-paperclip fs-5"></i>
@@ -102,8 +107,9 @@
               type="text"
               class="form-control border-0"
               placeholder="Nhập tin nhắn của bạn..."
+              :disabled="!activeClient"
             />
-            <button class="btn btn-primary-custom" type="button" @click="sendMessage">
+            <button class="btn btn-primary-custom" type="button" @click="sendMessage" :disabled="!activeClient">
               <i class="bi bi-send-fill"></i>
             </button>
           </div>
@@ -141,7 +147,6 @@ export default {
 
         if (data.type === "support_request") {
           this.addOrUpdateClient(data.clientId, true);
-          // ✅ Gửi sự kiện lên AdminLayout để hiển thị toast
           this.$emit("support-request", data.clientId);
         }
 
@@ -157,7 +162,7 @@ export default {
     addOrUpdateClient(clientId, hasRequest = false) {
       let client = this.clients.find((c) => c.id === clientId);
       if (!client) {
-        client = { id: clientId, hasRequest };
+        client = { id: clientId, hasRequest: hasRequest };
         this.clients.push(client);
       } else if (hasRequest) {
         client.hasRequest = true;
@@ -165,8 +170,8 @@ export default {
     },
 
     selectClient(client) {
+      if (client.hasRequest) return;
       this.activeClient = client;
-      client.hasRequest = false;
       this.chatMessages = []; // reset hoặc có thể load lịch sử
     },
 
@@ -182,6 +187,23 @@ export default {
         })
       );
       this.newMessage = "";
+    },
+
+    acceptRequest(client) {
+      this.ws.send(JSON.stringify({
+        type: "admin_accept_request",
+        clientId: client.id,
+      }));
+      client.hasRequest = false;
+      this.selectClient(client);
+    },
+
+    declineRequest(client) {
+      this.ws.send(JSON.stringify({
+        type: "admin_decline_request",
+        clientId: client.id,
+      }));
+      client.hasRequest = false;
     },
 
     getLastMessage(clientId) {
@@ -200,6 +222,13 @@ export default {
 </script>
 
 <style scoped>
+.support-request-actions {
+  padding: 10px;
+  border-radius: 5px;
+  text-align: center;
+  background-color: #fff3cd;
+}
+
 @keyframes message-fade-in {
   from {
     opacity: 0;
@@ -252,6 +281,7 @@ export default {
 .chat-footer {
   background-color: var(--sidebar-bg);
   border-top: 1px solid var(--border-color);
+  padding: 1rem 1.5rem 1.5rem 1.5rem; /* Adjusted padding */
 }
 .chat-footer .form-control {
   background-color: var(--background-color);
@@ -272,6 +302,7 @@ export default {
   align-items: center;
   justify-content: center;
   transition: background-color 0.3s ease;
+  margin-left: 8px; /* Added margin */
 }
 .btn-primary-custom:hover {
   background-color: #3a448a;

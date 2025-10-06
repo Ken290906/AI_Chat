@@ -27,7 +27,19 @@ app.post("/api/chat", async (req, res) => {
   try {
     const { message } = req.body;
 
-    console.log("Sending direct fetch request to Ollama API...");
+    const systemPrompt = `Bối cảnh: Bạn là một nhân viên tư vấn nhiệt tình và am hiểu của thương hiệu trà sữa "The Alley". Nhiệm vụ của bạn là dựa vào menu dưới đây để giới thiệu, giải đáp thắc mắc và giúp khách hàng chọn được món đồ uống ưng ý nhất. Hãy luôn giữ giọng văn thân thiện, vui vẻ.
+
+Menu của chúng ta:
+- Sữa tươi trân châu đường đen: Best seller! Vị sữa tươi thanh mát, béo ngậy từ Đà Lạt kết hợp với trân châu đường đen được nấu trong 2 tiếng, tạo nên hương vị ngọt thơm, dai mềm khó cưỡng.
+- Trà sữa Oolong nướng: Hương trà Oolong đậm vị, được "nướng" nhẹ qua lửa để dậy lên mùi caramen độc đáo. Phù hợp cho những ai thích vị trà đậm, hậu vị ngọt ngào.
+- Trà xanh Chanh dây: Một sự kết hợp sảng khoái giữa vị trà xanh thanh mát và chanh dây chua ngọt, kèm theo hạt chia giòn giòn. Rất phù hợp cho ngày hè nóng nực.
+- Trà sữa Socola Trân châu: Vị socola Bỉ đậm đà, ngọt ngào hòa quyện cùng sữa và trân châu dai giòn. Món quà cho các tín đồ hảo ngọt.
+
+Nhiệm vụ: Bây giờ, hãy trả lời câu hỏi của khách hàng dưới đây.
+---
+Khách hàng: "${message}"`;
+
+    console.log("Sending prompt-engineered request to Ollama API...");
 
     const response = await fetch(API_URL, {
       method: "POST",
@@ -36,7 +48,7 @@ app.post("/api/chat", async (req, res) => {
       },
       body: JSON.stringify({
         model: "gemma3:4b",
-        prompt: message,
+        prompt: systemPrompt,
       }),
     });
 
@@ -124,6 +136,27 @@ wss.on("connection", (ws, req) => {
             message: data.message,
           })
         );
+      }
+      return;
+    }
+
+    if (data.type === "admin_accept_request") {
+      const client = clients.get(data.clientId);
+      if (client && client.readyState === ws.OPEN) {
+        client.send(JSON.stringify({ type: "agent_accepted" }));
+        console.log(`✅ Admin accepted support for ${data.clientId}`);
+      }
+      return;
+    }
+
+    if (data.type === "admin_decline_request") {
+      const client = clients.get(data.clientId);
+      if (client && client.readyState === ws.OPEN) {
+        client.send(JSON.stringify({
+          type: "agent_declined",
+          message: "⚠️ Rất tiếc, hiện tại các nhân viên đều đang bận. Vui lòng thử lại sau ít phút.",
+        }));
+        console.log(`❌ Admin declined support for ${data.clientId}`);
       }
       return;
     }
