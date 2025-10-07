@@ -4,8 +4,59 @@ import fetch from "node-fetch";
 import cors from "cors";
 import http from "http";
 import { WebSocketServer } from "ws";
+import xlsx from "xlsx";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 dotenv.config();
+
+// =========================
+// ✅ PHẦN ĐỌC MENU TỰ ĐỘNG TỪ FILE EXCEL
+// =========================
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+let menuPrompt = "Hiện tại menu chưa được cập nhật. Vui lòng quay lại sau.";
+
+function loadMenuData() {
+  const menuPath = path.resolve(__dirname, '../my-app/src/assets/Menu.xlsx');
+  console.log(`Đang tìm kiếm menu tại: ${menuPath}`);
+
+  if (fs.existsSync(menuPath)) {
+    try {
+      const workbook = xlsx.readFile(menuPath);
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const menuJson = xlsx.utils.sheet_to_json(worksheet);
+
+      if (menuJson.length > 0) {
+        let formattedMenu = "Menu của chúng ta:\n";
+        menuJson.forEach(item => {
+          // Giả sử các cột trong Excel có tên là 'Tên Món', 'Giá', 'Mô tả'
+          const name = item['Tên đồ uống'] || 'Tên không xác định';
+          const price = item['Giá'] ? `${item['Giá']}đ` : 'Giá liên hệ';
+          const description = item['Mô tả'] || 'Không có mô tả';
+          formattedMenu += `- ${name} (${price}): ${description}\n`;
+        });
+        menuPrompt = formattedMenu;
+        console.log("✅ Menu đã được tải và định dạng thành công!");
+      } else {
+        console.log("⚠️ Tệp Menu.xlsx trống hoặc không có dữ liệu.");
+        menuPrompt = "Menu đang được cập nhật. Xin lỗi vì sự bất tiện này.";
+      }
+    } catch (error) {
+      console.error("❌ Lỗi khi đọc hoặc xử lý tệp Menu.xlsx:", error);
+      menuPrompt = "Đã có lỗi xảy ra khi tải menu. Vui lòng liên hệ quản trị viên.";
+    }
+  } else {
+    console.log(`❌ Không tìm thấy tệp Menu.xlsx tại đường dẫn: ${menuPath}`);
+    menuPrompt = "Không tìm thấy thông tin menu. Vui lòng đảm bảo tệp Menu.xlsx tồn tại.";
+  }
+}
+
+loadMenuData(); // Tải menu ngay khi server khởi động
+
 const app = express();
 
 app.use(
@@ -21,21 +72,15 @@ app.use(express.json());
 const API_URL = "http://localhost:11434/api/generate";
 
 // =========================
-// ✅ PHẦN CHAT VỚI AI (GỐC GIỮ NGUYÊN)
+// ✅ PHẦN CHAT VỚI AI (SỬ DỤNG MENU ĐỘNG)
 // =========================
 app.post("/api/chat", async (req, res) => {
   try {
     const { message } = req.body;
 
     const systemPrompt = `Bối cảnh: Bạn là một nhân viên tư vấn nhiệt tình và am hiểu của thương hiệu trà sữa "The Alley". Nhiệm vụ của bạn là dựa vào menu dưới đây để giới thiệu, giải đáp thắc mắc và giúp khách hàng chọn được món đồ uống ưng ý nhất. Hãy luôn giữ giọng văn thân thiện, vui vẻ.
-
-Menu của chúng ta:
-- Sữa tươi trân châu đường đen: Best seller! Vị sữa tươi thanh mát, béo ngậy từ Đà Lạt kết hợp với trân châu đường đen được nấu trong 2 tiếng, tạo nên hương vị ngọt thơm, dai mềm khó cưỡng.
-- Trà sữa Oolong nướng: Hương trà Oolong đậm vị, được "nướng" nhẹ qua lửa để dậy lên mùi caramen độc đáo. Phù hợp cho những ai thích vị trà đậm, hậu vị ngọt ngào.
-- Trà xanh Chanh dây: Một sự kết hợp sảng khoái giữa vị trà xanh thanh mát và chanh dây chua ngọt, kèm theo hạt chia giòn giòn. Rất phù hợp cho ngày hè nóng nực.
-- Trà sữa Socola Trân châu: Vị socola Bỉ đậm đà, ngọt ngào hòa quyện cùng sữa và trân châu dai giòn. Món quà cho các tín đồ hảo ngọt.
-
-Nhiệm vụ: Bây giờ, hãy trả lời câu hỏi của khách hàng dưới đây.
+\n${menuPrompt}
+\nNhiệm vụ: Bây giờ, hãy trả lời câu hỏi của khách hàng dưới đây.
 ---
 Khách hàng: "${message}"`;
 
@@ -69,7 +114,7 @@ Khách hàng: "${message}"`;
 });
 
 // =========================
-// ✅ WEBSOCKET PHẦN CHAT ADMIN - CLIENT
+// ✅ WEBSOCKET PHẦN CHAT ADMIN - CLIENT (KHÔNG THAY ĐỔI)
 // =========================
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
