@@ -61,7 +61,7 @@ const app = express();
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: ["http://localhost:5173", "https://fm96q54s-5173.asse.devtunnels.ms"],
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type"],
   })
@@ -78,7 +78,7 @@ app.post("/api/chat", async (req, res) => {
   try {
     const { message } = req.body;
 
-    const systemPrompt = `Bối cảnh: Bạn là một nhân viên tư vấn nhiệt tình và am hiểu của thương hiệu trà sữa "The Alley". Nhiệm vụ của bạn là dựa vào menu dưới đây để giới thiệu, giải đáp thắc mắc và giúp khách hàng chọn được món đồ uống ưng ý nhất. Hãy luôn giữ giọng văn thân thiện, vui vẻ.
+    const systemPrompt = `Bối cảnh: Bạn là một nhân viên tư vấn nhiệt tình và am hiểu của thương hiệu trà sữa "Tâm Trà". Nhiệm vụ của bạn là dựa vào menu dưới đây để giới thiệu, giải đáp thắc mắc và giúp khách hàng chọn được món đồ uống ưng ý nhất. Hãy luôn giữ giọng văn thân thiện, vui vẻ.
 \n${menuPrompt}
 \nNhiệm vụ: Bây giờ, hãy trả lời câu hỏi của khách hàng dưới đây.
 ---
@@ -213,6 +213,6 @@ wss.on("connection", (ws, req) => {
 });
 
 const port = process.env.PORT || 3000;
-server.listen(port, () => {
+server.listen(port, '0.0.0.0',() => {
   console.log(`🚀 Server (Express + WebSocket) running on port ${port}`);
 });

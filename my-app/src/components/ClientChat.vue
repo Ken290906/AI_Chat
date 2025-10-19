@@ -105,7 +105,9 @@ export default {
       }
     },
     connectWebSocket() {
-      this.ws = new WebSocket("ws://localhost:3000");
+      const backendHost = window.location.hostname.replace('-5173', '-3000');
+      const wsUrl = `wss://${backendHost}`;
+      this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
         this.ws.send(JSON.stringify({ type: "client_register", clientId: this.clientId }));
@@ -193,7 +195,9 @@ export default {
 
       this.isTyping = true;
       try {
-        const response = await axios.post("http://localhost:3000/api/chat", { message: text });
+        const backendHost = window.location.hostname.replace('-5173', '-3000');
+        const httpUrl = `https://${backendHost}`;
+        const response = await axios.post(`${httpUrl}/api/chat`, { message: text });
         this.messages.push({ text: response.data.reply, isUser: false });
       } catch (error) {
         this.messages.push({ text: "❌ Lỗi khi gửi tin nhắn tới AI.", isUser: false });
