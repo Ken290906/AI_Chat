@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+import db from './models/index.js'; // Add this import
 import fetch from "node-fetch";
 import cors from "cors";
 import http from "http";
@@ -8,6 +9,9 @@ import xlsx from "xlsx";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+
+// use controller
+import nhatKyXuLyRoutes from './routes/nhatkyxuly.js';
 
 dotenv.config();
 
@@ -69,6 +73,8 @@ app.use(
 
 app.use(express.json());
 
+app.use('/api', nhatKyXuLyRoutes); // Add this line
+
 const API_URL = "http://localhost:11434/api/generate";
 
 // =========================
@@ -78,7 +84,7 @@ app.post("/api/chat", async (req, res) => {
   try {
     const { message } = req.body;
 
-    const systemPrompt = `Bối cảnh: Bạn là một nhân viên tư vấn nhiệt tình và am hiểu của thương hiệu trà sữa "The Alley". Nhiệm vụ của bạn là dựa vào menu dưới đây để giới thiệu, giải đáp thắc mắc và giúp khách hàng chọn được món đồ uống ưng ý nhất. Hãy luôn giữ giọng văn thân thiện, vui vẻ.
+    const systemPrompt = `Bối cảnh: Bạn là một nhân viên tư vấn nhiệt tình và am hiểu của thương hiệu trà sữa "Tâm Trà". Nhiệm vụ của bạn là dựa vào menu dưới đây để giới thiệu, giải đáp thắc mắc và giúp khách hàng chọn được món đồ uống ưng ý nhất. Hãy luôn giữ giọng văn thân thiện, vui vẻ.
 \n${menuPrompt}
 \nNhiệm vụ: Bây giờ, hãy trả lời câu hỏi của khách hàng dưới đây.
 ---
@@ -211,6 +217,16 @@ wss.on("connection", (ws, req) => {
     console.log("🔴 Connection closed");
   });
 });
+
+db.sequelize.authenticate()
+  .then(() => {
+    console.log('✅ Database connection has been established successfully.');
+  })
+  .catch(err => {
+    console.error('❌ Unable to connect to the database:', err);
+    // Optionally, exit the process if DB connection is critical
+    // process.exit(1);
+  });
 
 const port = process.env.PORT || 3000;
 server.listen(port, () => {
