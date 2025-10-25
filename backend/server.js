@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+import db from './models/index.js'; // Add this import
 import fetch from "node-fetch";
 import cors from "cors";
 import http from "http";
@@ -8,6 +9,9 @@ import xlsx from "xlsx";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+
+// use controller
+import nhatKyXuLyRoutes from './routes/nhatkyxuly.js';
 
 dotenv.config();
 
@@ -61,13 +65,15 @@ const app = express();
 
 app.use(
   cors({
-    origin: ["http://localhost:5173", "https://fm96q54s-5173.asse.devtunnels.ms"],
+    origin: "http://localhost:5173",
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type"],
   })
 );
 
 app.use(express.json());
+
+app.use('/api', nhatKyXuLyRoutes); // Add this line
 
 const API_URL = "http://localhost:11434/api/generate";
 
@@ -212,7 +218,17 @@ wss.on("connection", (ws, req) => {
   });
 });
 
+db.sequelize.authenticate()
+  .then(() => {
+    console.log('✅ Database connection has been established successfully.');
+  })
+  .catch(err => {
+    console.error('❌ Unable to connect to the database:', err);
+    // Optionally, exit the process if DB connection is critical
+    // process.exit(1);
+  });
+
 const port = process.env.PORT || 3000;
-server.listen(port, '0.0.0.0',() => {
+server.listen(port, () => {
   console.log(`🚀 Server (Express + WebSocket) running on port ${port}`);
 });

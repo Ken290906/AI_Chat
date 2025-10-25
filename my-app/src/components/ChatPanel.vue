@@ -136,9 +136,7 @@ export default {
   },
   methods: {
     connectWebSocket() {
-      const backendHost = window.location.hostname.replace('-5173', '-3000');
-      const wsUrl = `wss://${backendHost}`;
-      this.ws = new WebSocket(wsUrl);
+      this.ws = new WebSocket("ws://localhost:3000");
 
       this.ws.onopen = () => {
         this.ws.send(JSON.stringify({ type: "admin_register" }));

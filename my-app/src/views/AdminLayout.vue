@@ -1,39 +1,21 @@
-[file name]: AdminLayout.vue
-[file content begin]
 <template>
   <div id="app-layout" :class="{'sidebar-collapsed': !isSidebarOpen}">
     <Header @toggle-notifications="toggleToast" />
-    <!-- <ToastNotification :show="showToast" @close="showToast = false" /> -->
-    <!-- ✅ Gán ref để gọi hàm show() trực tiếp -->
     <ToastNotification ref="toastRef" :show="showToast" @close="showToast = false" />
 
     <div class="main-content container-fluid">
       <div class="row flex-nowrap">
         <div class="col-auto p-0 sidebar-wrapper">
-          <Sidebar 
-            :isOpen="isSidebarOpen" 
+          <Sidebar
+            :isOpen="isSidebarOpen"
             :activeTab="activeTab"
             @toggle-sidebar="toggleSidebar"
             @selectTab="handleTabSelect" />
         </div>
-        
-        <!-- Dashboard View - Chiếm toàn bộ không gian còn lại -->
-        <div v-if="activeTab === 'dashboard'" class="col p-0">
-          <Dashboard />
-        </div>
-        
-        <!-- Chat View - Với InfoPanel bên cạnh -->
-        <div v-else class="col p-0">
-          <div class="row h-100">
-            <div class="col-md-9 p-0">
-              <!-- <ChatPanel /> -->
-               <!-- ✅ Lắng nghe sự kiện support-request từ ChatPanel -->
-              <ChatPanel @support-request="handleSupportRequest" />
-            </div>
-            <div class="col-md-3 d-none d-md-block p-0">
-              <InfoPanel />
-            </div>
-          </div>
+
+        <!-- Use router-view to render components based on the current route -->
+        <div class="col p-0">
+          <router-view />
         </div>
       </div>
     </div>
@@ -47,6 +29,7 @@ import ChatPanel from '../components/ChatPanel.vue'
 import InfoPanel from '../components/InfoPanel.vue'
 import ToastNotification from '../components/ToastNotification.vue'
 import Dashboard from '../components/Dashboard.vue'
+// SettingsLayout import removed
 
 export default {
   name: 'AdminLayout',
@@ -57,6 +40,7 @@ export default {
     InfoPanel,
     ToastNotification,
     Dashboard
+    // SettingsLayout component registration removed
   },
   data() {
     return {
@@ -79,9 +63,16 @@ export default {
     },
     handleTabSelect(tab) {
       this.activeTab = tab;
+      // Navigate to the corresponding route
+      if (tab === 'dashboard') {
+        this.$router.push({ name: 'Dashboard' });
+      } else if (tab === 'chat') {
+        this.$router.push({ name: 'Chat' });
+      } else if (tab === 'settings') {
+        this.$router.push({ name: 'Settings' });
+      }
     },
 
-    // ✅ HÀM MỚI: xử lý sự kiện support-request từ ChatPanel
     handleSupportRequest(clientId) {
       if (this.$refs.toastRef && this.$refs.toastRef.show) {
         this.$refs.toastRef.show(`📢 Khách hàng ${clientId} cần hỗ trợ gấp!`);
@@ -160,4 +151,3 @@ body {
   background: #aaa;
 }
 </style>
-[file content end]

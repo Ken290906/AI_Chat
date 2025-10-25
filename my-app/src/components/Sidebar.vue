@@ -1,5 +1,3 @@
-[file name]: Sidebar.vue
-[file content begin]
 <template>
   <div :class="['sidebar', 'd-flex', 'flex-column', 'p-3', {'collapsed': !isOpen}]">
     <div class="dropdown mb-3">
@@ -35,16 +33,6 @@
       </li>
       <li>
         <a href="#" 
-          :class="['nav-link', {'justify-content-center': !isOpen, 'active': activeTab === 'list'}]"
-          @click.prevent="setActiveTab('list')">
-          <i class="bi bi-people me-2"></i>
-          <transition name="fade-slide">
-            <span v-show="isOpen">Danh sách</span>
-          </transition>
-        </a>
-      </li>
-      <li>
-        <a href="#" 
           :class="['nav-link', {'justify-content-center': !isOpen, 'active': activeTab === 'chat'}]"
           @click.prevent="setActiveTab('chat')">
           <i class="bi bi-chat-quote me-2"></i>
@@ -53,16 +41,6 @@
           </transition>
           <transition name="fade-slide">
             <span v-show="isOpen" class="badge bg-danger rounded-pill ms-auto">1</span>
-          </transition>
-        </a>
-      </li>
-      <li>
-        <a href="#" 
-          :class="['nav-link', {'justify-content-center': !isOpen, 'active': activeTab === 'orders'}]"
-          @click.prevent="setActiveTab('orders')">
-          <i class="bi bi-receipt-cutoff me-2"></i>
-          <transition name="fade-slide">
-            <span v-show="isOpen">Đơn hàng</span>
           </transition>
         </a>
       </li>
@@ -209,4 +187,3 @@ hr {
   transform: translateX(-10px);
 }
 </style>
-[file content end]
