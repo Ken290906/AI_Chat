@@ -1,45 +1,49 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import AdminLayout from '../views/AdminLayout.vue'
 import ClientChat from '../components/ClientChat.vue'
-import AccessLog from '../components/AccessLog.vue' // Keep this import
-// import SettingsLayout from '../views/SettingsLayout.vue' // Removed import
+import AccessLog from '../components/AccessLog.vue'
 
 const routes = [
   {
     path: '/',
     name: 'Admin',
     component: AdminLayout,
-    children: [ // Nested routes for AdminLayout
+    children: [
       {
-        path: '', // Default child route for AdminLayout (e.g., /)
+        path: '',
         redirect: { name: 'Dashboard' }
       },
       {
-        path: 'dashboard', // /dashboard
+        path: 'dashboard',
         name: 'Dashboard',
-        component: () => import('../components/Dashboard.vue') // Lazy load Dashboard
+        component: () => import('../components/Dashboard.vue')
       },
       {
-        path: 'chat', // /chat
+        path: 'chat',
         name: 'Chat',
-        component: () => import('../components/ChatPanel.vue') // Lazy load ChatPanel
+        component: () => import('../components/ChatPanel.vue')
       },
       {
-        path: 'settings', // /settings
+        path: 'settings',
         name: 'Settings',
-        component: AccessLog // Directly render AccessLog
+        component: AccessLog
       }
     ]
   },
   {
     path: '/client',
-    name: 'ClientChat', // Renamed to avoid conflict with 'Client' in AdminLayout
+    name: 'ClientChat',
     component: ClientChat
+  },
+  {
+    path: '/login',
+    name: 'EmployeeLogin',
+    component: () => import('../views/EmployeeLogin.vue')
   }
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(), // SỬA THÀNH createWebHistory (bỏ chữ Web thừa)
   routes
 })
 

@@ -2,62 +2,100 @@
   <div class="client-chat-container d-flex flex-column" style="height: 100vh; width: 100vw;">
     <!-- Chat Header -->
     <div class="chat-header p-3 border-bottom d-flex align-items-center">
-      <img src="https://i.pravatar.cc/40?u=at" class="rounded-circle me-3" alt="AT">
+      <img 
+        :src="employeeInfo ? `https://i.pravatar.cc/40?u=employee${employeeInfo.MaNV}` : 'https://i.pravatar.cc/40?u=ai'" 
+        class="rounded-circle me-3" 
+        :alt="employeeInfo ? employeeInfo.HoTen : 'Trợ lý AI (Gemma3)'"
+        style="width: 40px; height: 40px; object-fit: cover;"
+      >
       <div>
-        <h6 class="mb-0 fw-bold">AT</h6>
+        <h6 class="mb-0 fw-bold">
+          {{ employeeInfo ? employeeInfo.HoTen : 'Trợ lý AI (Gemma3)' }}
+        </h6>
         <small class="text-muted">
-          {{ isAdminChat ? 'Nhân viên hỗ trợ' : 'Trợ lý AI (Gemma3)' }}
+          {{ employeeInfo ? 'Nhân viên hỗ trợ' : 'Trợ lý ảo' }}
         </small>
       </div>
     </div>
 
     <!-- Chat Body -->
-    <div class="chat-body flex-grow-1 p-3 overflow-auto" ref="chatBody">
+    <div class="chat-body flex-grow-1 p-4 overflow-auto" ref="chatBody">
+      <!-- Thông báo kết nối thành công với nhân viên -->
+      <div v-if="employeeInfo" class="text-center mb-3">
+        <div class="alert alert-success alert-dismissible fade show d-inline-flex align-items-center" role="alert">
+          <i class="bi bi-check-circle-fill me-2"></i>
+          <div>
+            <strong>Đã kết nối với {{ employeeInfo.HoTen }}</strong>
+            <div class="small">Nhân viên hỗ trợ</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TIN NHẮN -->
       <div
         v-for="(message, index) in messages"
         :key="index"
-        :class="['mb-3', message.isUser ? 'd-flex justify-content-end' : 'd-flex justify-content-start']"
+        :class="['d-flex', message.isUser ? 'justify-content-end' : 'justify-content-start', 'mb-3', 'message-animation']"
       >
-        <!-- Agent Message -->
-        <template v-if="!message.isUser">
-          <img src="https://i.pravatar.cc/32?u=agent" class="rounded-circle me-2 agent-avatar" alt="Agent">
-          <div class="message-content">
-            <div class="message-bubble agent-message">
-              <VueMarkdown :source="message.text" />
+        <!-- Tin nhắn từ User (khách hàng) -->
+        <template v-if="message.isUser">
+          <div class="message-bubble user-message">
+            {{ message.text }}
+            <div class="text-end text-muted small mt-1">
+              {{ formatMessageTime(message.timestamp) }}
             </div>
           </div>
         </template>
 
-        <!-- User Message -->
-        <div v-else class="message-bubble user-message">{{ message.text }}</div>
+        <!-- Tin nhắn từ Agent (nhân viên/AI) -->
+        <template v-else>
+          <img
+            :src="getAvatarSource()"
+            :alt="getAgentName()"
+            width="32"
+            height="32"
+            class="rounded-circle me-2"
+          />
+          <div class="message-bubble agent-message">
+            {{ message.text }}
+            <!-- Hiển thị tên người gửi cho tin nhắn từ nhân viên -->
+            <div v-if="employeeInfo && index > 0" class="text-white-50 small mb-1">
+              {{ employeeInfo.HoTen }}
+            </div>
+            <div class="text-end text-white-50 small mt-1">
+              {{ formatMessageTime(message.timestamp) }}
+            </div>
+          </div>
+        </template>
       </div>
 
       <!-- Loading Effect -->
-      <div v-if="isTyping && !isAdminChat" class="d-flex justify-content-start mb-3 loading-message animate__animated animate__fadeIn">
-        <img src="https://i.pravatar.cc/32?u=agent" class="rounded-circle me-2 agent-avatar" alt="Agent">
-        <div class="message-content">
-          <div class="message-bubble agent-message d-flex align-items-center">
-            <div class="spinner"></div>
-            <span class="ms-2">Đang trả lời...</span>
-          </div>
+      <div v-if="isTyping && !employeeInfo" class="d-flex justify-content-start mb-3 loading-message animate__animated animate__fadeIn">
+        <img :src="getAvatarSource()" class="rounded-circle me-2" alt="Agent" width="32" height="32">
+        <div class="message-bubble agent-message d-flex align-items-center">
+          <div class="spinner"></div>
+          <span class="ms-2">Đang trả lời...</span>
         </div>
       </div>
     </div>
 
     <!-- Chat Footer -->
-    <div class="chat-footer p-3 border-top">
+    <div class="chat-footer">
       <div class="input-group">
-        <button class="btn btn-outline-secondary border-0" type="button"><i class="bi bi-plus-lg"></i></button>
+        <button class="btn btn-outline-secondary border-0" type="button">
+          <i class="bi bi-paperclip fs-5"></i>
+        </button>
         <input
           v-model="newMessage"
           @keyup.enter="sendMessage"
           type="text"
           class="form-control border-0"
-          :placeholder="isAwaitingAdmin ? 'Đang chờ nhân viên hỗ trợ...' : 'Nhập câu hỏi của bạn tại đây...'"
+          :placeholder="getPlaceholderText()"
           :disabled="isAwaitingAdmin"
-        >
-        <button class="btn btn-outline-secondary border-0" type="button"><i class="bi bi-mic-fill"></i></button>
-        <button class="btn btn-outline-secondary border-0" type="button" @click="sendMessage" :disabled="isAwaitingAdmin"><i class="bi bi-send-fill"></i></button>
+        />
+        <button class="btn btn-primary-custom" type="button" @click="sendMessage" :disabled="isAwaitingAdmin">
+          <i class="bi bi-send-fill"></i>
+        </button>
       </div>
     </div>
   </div>
@@ -75,15 +113,22 @@ export default {
   data() {
     return {
       ws: null,
-      clientId: Math.random().toString(36).substring(2, 9),
+      clientId: null,
+      clientInfo: null,
+      employeeInfo: null,
       messages: [
-        { text: "Xin chào! Mình có thể giúp gì cho bạn hôm nay?", isUser: false, id: 'initial' },
+        { 
+          text: "Xin chào! Mình có thể giúp gì cho bạn hôm nay?", 
+          isUser: false, 
+          id: 'initial',
+          timestamp: new Date()
+        },
       ],
       newMessage: "",
       isTyping: false,
-      isAdminChat: false, // false = AI mode, true = Admin mode
-      promptCount: 0, // Count user prompts to AI
-      isAwaitingAdmin: false, // True when waiting for admin to accept/decline
+      isAdminChat: false,
+      promptCount: 0,
+      isAwaitingAdmin: false,
     };
   },
   watch: {
@@ -93,84 +138,187 @@ export default {
       });
     }
   },
-  mounted() {
+  async mounted() {
+    const urlParams = new URLSearchParams(window.location.search);
+    this.clientId = urlParams.get('clientId') || '1';
+    
+    await this.fetchClientInfo();
     this.connectWebSocket();
     this.scrollToBottom();
   },
   methods: {
+    getAgentRole() {
+      if (this.employeeInfo) {
+        return `Nhân viên hỗ trợ`;
+      }
+      return 'Trợ lý ảo';
+    },
+
+     getAvatarSource() {
+      if (this.employeeInfo) {
+        return `https://i.pravatar.cc/40?u=employee${this.employeeInfo.MaNV}`;
+      }
+      return 'https://i.pravatar.cc/40?u=ai';
+    },
+
+    getAgentName() {
+      if (this.employeeInfo) {
+        return this.employeeInfo.HoTen;
+      }
+      return 'Trợ lý AI (Gemma3)';
+    },
+    getCurrentChatStatus() {
+      console.log("🔄 Chat Status Debug:");
+      console.log("  - employeeInfo:", this.employeeInfo);
+      console.log("  - isAdminChat:", this.isAdminChat);
+      console.log("  - isAwaitingAdmin:", this.isAwaitingAdmin);
+      console.log("  - Agent Name:", this.getAgentName());
+      console.log("  - Agent Role:", this.getAgentRole());
+    },
+
+    getPlaceholderText() {
+      if (this.isAwaitingAdmin) {
+        return 'Đang chờ nhân viên hỗ trợ...';
+      } else if (this.isAdminChat && this.employeeInfo) {
+        return `Nhắn tin với ${this.employeeInfo.HoTen}...`;
+      } else {
+        return 'Nhập tin nhắn của bạn...';
+      }
+    },
+    
+    formatMessageTime(timestamp) {
+      if (!timestamp) return '';
+      const date = new Date(timestamp);
+      return date.toLocaleTimeString('vi-VN', { 
+        hour: "2-digit", 
+        minute: "2-digit" 
+      });
+    },
+    
+    async fetchClientInfo() {
+      try {
+        const response = await axios.get(`http://localhost:3000/api/auth/client/${this.clientId}`);
+        this.clientInfo = response.data;
+        console.log("✅ Client info loaded:", this.clientInfo);
+      } catch (error) {
+        console.error("❌ Error fetching client info:", error);
+        this.clientInfo = { 
+          MaKH: this.clientId, 
+          HoTen: `Khách ${this.clientId}` 
+        };
+      }
+    },
+    
     scrollToBottom() {
       const chatBody = this.$refs.chatBody;
       if (chatBody) {
         chatBody.scrollTo({ top: chatBody.scrollHeight, behavior: 'smooth' });
       }
     },
+    
     connectWebSocket() {
       this.ws = new WebSocket("ws://localhost:3000");
 
       this.ws.onopen = () => {
-        this.ws.send(JSON.stringify({ type: "client_register", clientId: this.clientId }));
-      };
+        console.log("✅ WebSocket connected as client:", this.clientId);
+        this.ws.send(JSON.stringify({ 
+          type: "client_register", 
+          clientId: this.clientId 
+        }));
+      },
 
       this.ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
+        console.log("🔍 DEBUG - WebSocket message received:", data);
+        console.log("🔍 DEBUG - Current state - isAdminChat:", this.isAdminChat, "employeeInfo:", this.employeeInfo);
         const connectingMsgIndex = this.messages.findIndex(
           (msg) => msg.id === 'connecting_message'
         );
 
+        setTimeout(() => {
+          this.getCurrentChatStatus();
+        }, 100);
+
         if (data.type === "agent_accepted") {
           this.isAwaitingAdmin = false;
-          this.isAdminChat = true; // Officially in admin chat
-          if (connectingMsgIndex !== -1) {
-            this.messages.splice(connectingMsgIndex, 1, {
-              text: "✅ Nhân viên đã kết nối. Bạn có thể bắt đầu cuộc trò chuyện!",
+          this.isAdminChat = true;
+          
+          if (data.employee) {
+            this.employeeInfo = data.employee;
+            console.log("✅ Connected with employee:", this.employeeInfo);
+            
+            this.messages.push({
+              text: `✅ Đã kết nối với ${this.employeeInfo.HoTen}. Bạn có thể bắt đầu trò chuyện!`,
               isUser: false,
-              id: 'connected_confirmation'
+              timestamp: new Date()
             });
+          }
+          
+          if (connectingMsgIndex !== -1) {
+            this.messages.splice(connectingMsgIndex, 1);
           }
         } else if (data.type === "agent_declined") {
           this.isAwaitingAdmin = false;
           if (connectingMsgIndex !== -1) {
             this.messages.splice(connectingMsgIndex, 1, {
-              text: data.message, // "Sorry, all agents are busy..."
+              text: data.message,
               isUser: false,
-              id: 'declined_confirmation'
+              timestamp: new Date()
             });
           }
-          this.isAdminChat = false; // Revert to AI chat mode
-          this.promptCount = 0; // Reset counter
+          this.isAdminChat = false;
+          this.promptCount = 0;
+          this.employeeInfo = null;
         } else if (data.type === "admin_message") {
-          this.messages.push({ text: data.message.trim(), isUser: false });
+          this.messages.push({ 
+            text: data.message.trim(), 
+            isUser: false,
+            timestamp: new Date()
+          });
         }
+      };
+
+      this.ws.onclose = () => {
+        console.log("⚠️ WebSocket disconnected.");
+      };
+
+      this.ws.onerror = (error) => {
+        console.error("❌ WebSocket error:", error);
       };
     },
 
     requestSupport(reason) {
-      this.isAdminChat = true; // Tentatively switch to admin mode
+      this.isAdminChat = true;
       this.isAwaitingAdmin = true;
       this.ws.send(JSON.stringify({ type: "support_request", clientId: this.clientId }));
       this.messages.push({
         text: reason,
         isUser: false,
         id: 'connecting_message',
+        timestamp: new Date()
       });
     },
 
     async sendMessage() {
       if (!this.newMessage.trim() || this.isAwaitingAdmin) return;
       const text = this.newMessage.trim();
-      this.messages.push({ text, isUser: true });
+      this.messages.push({ 
+        text, 
+        isUser: true,
+        timestamp: new Date()
+      });
       this.newMessage = "";
 
-      // Handle admin chat logic first
       if (this.isAdminChat) {
         if (text.toLowerCase() === 'gemma') {
           this.isAdminChat = false;
           this.isAwaitingAdmin = false;
-          this.promptCount = 0; // Reset counter
+          this.promptCount = 0;
+          this.employeeInfo = null;
           this.messages.push({
             text: "🤖 Đã chuyển về chế độ chat với Trợ lý AI.",
             isUser: false,
-            id: 'switched_to_ai'
+            timestamp: new Date()
           });
           return;
         }
@@ -178,7 +326,6 @@ export default {
         return;
       }
 
-      // Handle AI chat logic
       this.promptCount++;
 
       if (this.promptCount >= 3) {
@@ -194,10 +341,17 @@ export default {
       this.isTyping = true;
       try {
         const response = await axios.post("http://localhost:3000/api/chat", { message: text });
-        this.messages.push({ text: response.data.reply, isUser: false });
+        this.messages.push({ 
+          text: response.data.reply, 
+          isUser: false,
+          timestamp: new Date()
+        });
       } catch (error) {
-        this.messages.push({ text: "❌ Lỗi khi gửi tin nhắn tới AI.", isUser: false });
-        // Trigger support request on AI error
+        this.messages.push({ 
+          text: "❌ Lỗi khi gửi tin nhắn tới AI.", 
+          isUser: false,
+          timestamp: new Date()
+        });
         this.requestSupport("☠️ AI đang gặp sự cố kỹ thuật. Hệ thống đang kết nối bạn với nhân viên hỗ trợ...");
       } finally {
         this.isTyping = false;
@@ -213,7 +367,7 @@ export default {
 
 <style scoped>
 .client-chat-container {
-  background-color: #f8f9fa;
+  background-color: var(--background-color);
 }
 
 .chat-header {
@@ -222,57 +376,79 @@ export default {
 }
 
 .chat-body {
-  background-color: #e9ecef;
+  background-color: var(--background-color);
   flex: 1;
 }
 
+/* Hiệu ứng tin nhắn mới - GIỐNG CHATPANEL */
+@keyframes message-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-animation {
+  animation: message-fade-in 0.5s ease-out;
+}
+
+/* Bubble tin nhắn - GIỐNG CHATPANEL */
 .message-bubble {
-  padding: 10px 15px;
-  border-radius: 1rem;
-  max-width: 100%;
-  word-wrap: break-word;
+  padding: 12px 20px;
+  border-radius: 20px;
+  max-width: 75%;
+  line-height: 1.5;
 }
 
 .user-message {
-  background-color: #e0f2f7;
+  background-color: #e9ecef;
   color: #333;
+  border-bottom-right-radius: 5px;
 }
 
 .agent-message {
-  background-color: white;
-  color: #333;
+  background: linear-gradient(to right, #4A55A2, #7895CB);
+  color: white;
+  border-bottom-left-radius: 5px;
 }
 
-.agent-avatar {
-  width: 32px;
-  height: 32px;
-  object-fit: cover;
-  border: 2px solid #e9ecef;
-  flex-shrink: 0;
-}
-
+/* Chat footer - GIỐNG CHATPANEL */
 .chat-footer {
-  background-color: white;
-  padding: 20px;
+  background-color: var(--sidebar-bg);
+  border-top: 1px solid var(--border-color);
+  padding: 1rem 1.5rem 1.5rem 1.5rem;
 }
 
-.chat-footer .input-group .form-control {
+.chat-footer .form-control {
+  background-color: var(--background-color);
   border-radius: 1rem !important;
-  background-color: #f1f3f4;
-  padding: 12px 20px;
-  font-size: 14px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-.chat-footer .input-group .btn {
-  border-radius: 1rem !important;
-  background-color: #f1f3f4;
-  border: none;
-  color: #666;
-  margin: 0 5px;
+.chat-footer .form-control:focus {
+  box-shadow: 0 0 0 0.25rem rgba(74, 85, 162, 0.25);
+  border-color: var(--primary-color);
 }
 
-.chat-footer .input-group .btn:hover {
-  background-color: #e1e3e4;
+.btn-primary-custom {
+  background-color: var(--primary-color);
+  color: white;
+  border-radius: 50% !important;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s ease;
+  margin-left: 8px;
+}
+
+.btn-primary-custom:hover {
+  background-color: #3a448a;
 }
 
 /* Spinner Animation */
@@ -290,5 +466,20 @@ export default {
   to {
     transform: rotate(360deg);
   }
+}
+
+.alert {
+  max-width: 80%;
+  margin: 0 auto;
+}
+
+/* CSS Variables từ ChatPanel */
+:root {
+  --primary-color: #4A55A2;
+  --accent-color: #C5DFF8;
+  --background-color: #F8F9FA;
+  --sidebar-bg: #FFFFFF;
+  --text-color: #343a40;
+  --border-color: #dee2e6;
 }
 </style>

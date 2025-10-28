@@ -1,17 +1,18 @@
 import express from "express";
 import dotenv from "dotenv";
-import db from './models/index.js'; // Add this import
+import db from './models/index.js';
 import fetch from "node-fetch";
 import cors from "cors";
 import http from "http";
-import { WebSocketServer } from "ws";
 import xlsx from "xlsx";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-// use controller
+// Import routes and WebSocket
 import nhatKyXuLyRoutes from './routes/nhatkyxuly.js';
+import authRoutes from './routes/auth.js'; // THÊM DÒNG NÀY
+import { setupWebSocket } from './websocket/websocket.js';
 
 dotenv.config();
 
@@ -37,7 +38,6 @@ function loadMenuData() {
       if (menuJson.length > 0) {
         let formattedMenu = "Menu của chúng ta:\n";
         menuJson.forEach(item => {
-          // Giả sử các cột trong Excel có tên là 'Tên Món', 'Giá', 'Mô tả'
           const name = item['Tên đồ uống'] || 'Tên không xác định';
           const price = item['Giá'] ? `${item['Giá']}đ` : 'Giá liên hệ';
           const description = item['Mô tả'] || 'Không có mô tả';
@@ -59,7 +59,7 @@ function loadMenuData() {
   }
 }
 
-loadMenuData(); // Tải menu ngay khi server khởi động
+loadMenuData();
 
 const app = express();
 
@@ -72,8 +72,8 @@ app.use(
 );
 
 app.use(express.json());
-
-app.use('/api', nhatKyXuLyRoutes); // Add this line
+app.use('/api', nhatKyXuLyRoutes);
+app.use('/api/auth', authRoutes); // THÊM DÒNG NÀY
 
 const API_URL = "http://localhost:11434/api/generate";
 
@@ -120,112 +120,20 @@ Khách hàng: "${message}"`;
 });
 
 // =========================
-// ✅ WEBSOCKET PHẦN CHAT ADMIN - CLIENT (KHÔNG THAY ĐỔI)
+// ✅ KHỞI TẠO SERVER VÀ WEBSOCKET
 // =========================
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
 
-let adminSocket = null;
-const clients = new Map();
+// Setup WebSocket
+setupWebSocket(server);
 
-wss.on("connection", (ws, req) => {
-  console.log("🟢 New WebSocket connection");
-
-  ws.on("message", (raw) => {
-    let data;
-    try {
-      data = JSON.parse(raw.toString());
-    } catch {
-      console.error("❌ Invalid message:", raw.toString());
-      return;
-    }
-
-    if (data.type === "admin_register") {
-      adminSocket = ws;
-      console.log("👨‍💼 Admin connected");
-      return;
-    }
-
-    if (data.type === "client_register") {
-      clients.set(data.clientId, ws);
-      console.log(`👤 Client ${data.clientId} connected`);
-      return;
-    }
-
-    if (data.type === "support_request") {
-      if (adminSocket) {
-        adminSocket.send(
-          JSON.stringify({
-            type: "support_request",
-            clientId: data.clientId,
-            message: "Khách hàng cần hỗ trợ gấp!",
-          })
-        );
-      }
-      return;
-    }
-
-    if (data.type === "admin_message") {
-      const client = clients.get(data.clientId);
-      if (client && client.readyState === ws.OPEN) {
-        client.send(
-          JSON.stringify({
-            type: "admin_message",
-            message: data.message,
-          })
-        );
-      }
-      return;
-    }
-
-    if (data.type === "client_message") {
-      if (adminSocket) {
-        adminSocket.send(
-          JSON.stringify({
-            type: "client_message",
-            clientId: data.clientId,
-            message: data.message,
-          })
-        );
-      }
-      return;
-    }
-
-    if (data.type === "admin_accept_request") {
-      const client = clients.get(data.clientId);
-      if (client && client.readyState === ws.OPEN) {
-        client.send(JSON.stringify({ type: "agent_accepted" }));
-        console.log(`✅ Admin accepted support for ${data.clientId}`);
-      }
-      return;
-    }
-
-    if (data.type === "admin_decline_request") {
-      const client = clients.get(data.clientId);
-      if (client && client.readyState === ws.OPEN) {
-        client.send(JSON.stringify({
-          type: "agent_declined",
-          message: "⚠️ Rất tiếc, hiện tại các nhân viên đều đang bận. Vui lòng thử lại sau ít phút.",
-        }));
-        console.log(`❌ Admin declined support for ${data.clientId}`);
-      }
-      return;
-    }
-  });
-
-  ws.on("close", () => {
-    console.log("🔴 Connection closed");
-  });
-});
-
+// Kết nối database
 db.sequelize.authenticate()
   .then(() => {
     console.log('✅ Database connection has been established successfully.');
   })
   .catch(err => {
     console.error('❌ Unable to connect to the database:', err);
-    // Optionally, exit the process if DB connection is critical
-    // process.exit(1);
   });
 
 const port = process.env.PORT || 3000;
