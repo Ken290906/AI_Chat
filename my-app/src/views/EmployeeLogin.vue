@@ -3,7 +3,6 @@
     <div class="login-box">
       <h1>Đăng nhập nhân viên</h1>
       <form @submit.prevent="login">
-        <!-- Replace dropdown with ID input field -->
         <div class="form-group">
           <label for="employeeId">ID nhân viên:</label>
           <input 
@@ -13,6 +12,7 @@
             placeholder="Nhập ID nhân viên" 
           />
         </div>
+
         <div class="form-group">
           <label for="password">Mật khẩu:</label>
           <input 
@@ -22,7 +22,15 @@
             placeholder="Nhập mật khẩu" 
           />
         </div>
-        <button type="submit">Đăng nhập</button>
+
+        <button type="submit" :disabled="isLoading">
+          {{ isLoading ? 'Đang đăng nhập...' : 'Đăng nhập' }}
+        </button>
+
+        <!-- Added error message display -->
+        <div v-if="errorMessage" class="error-message">
+          {{ errorMessage }}
+        </div>
       </form>
     </div>
   </div>
@@ -36,27 +44,40 @@ export default {
   data() {
     return {
       employeeId: '',
-      password: ''
+      password: '',
+      isLoading: false,
+      errorMessage: ''
     };
   },
   methods: {
     async login() {
       if (!this.employeeId || !this.password) {
-        alert('Vui lòng nhập ID nhân viên và mật khẩu');
+        this.errorMessage = 'Vui lòng nhập ID nhân viên và mật khẩu';
         return;
       }
 
+      this.isLoading = true;
+      this.errorMessage = '';
+
       try {
-        const response = await axios.post('http://localhost:3000/api/auth/employee/login', {
+        const res = await axios.post('http://localhost:3000/api/auth/employee/login', {
           employeeId: this.employeeId,
           password: this.password
         });
-        
-        if (response.data.success) {
-          this.$router.push('/chat');
+
+        if (res.data.success) {
+          localStorage.setItem('employee', JSON.stringify(res.data.employee));
+          localStorage.setItem('isLoggedIn', 'true');
+
+          this.$router.push({ name: 'Dashboard' });
+        } else {
+          this.errorMessage = res.data.error || "Thông tin đăng nhập không hợp lệ";
         }
-      } catch (error) {
-        alert('Đăng nhập thất bại: ' + (error.response?.data?.error || 'Lỗi server'));
+
+      } catch (err) {
+        this.errorMessage = "Đăng nhập thất bại: " + (err.response?.data?.error || "Lỗi server");
+      } finally {
+        this.isLoading = false;
       }
     }
   }
@@ -125,7 +146,23 @@ button {
   transition: transform 0.2s;
 }
 
-button:hover {
+button:hover:not(:disabled) {
   transform: translateY(-2px);
+}
+
+button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Added error message styling */
+.error-message {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #fee;
+  color: #c33;
+  border-radius: 5px;
+  font-size: 14px;
+  text-align: center;
 }
 </style>
