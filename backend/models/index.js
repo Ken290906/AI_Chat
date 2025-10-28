@@ -61,6 +61,10 @@ db.NhatKyXuLy.belongsTo(db.PhienChat, { foreignKey: 'MaPhienChat' });
 db.PhienChat.hasMany(db.TinNhan, { foreignKey: 'MaPhienChat' });
 db.TinNhan.belongsTo(db.PhienChat, { foreignKey: 'MaPhienChat' });
 
+// PhienChat and CanhBao
+db.PhienChat.hasMany(db.CanhBao, { foreignKey: 'MaPhienChat' });
+db.CanhBao.belongsTo(db.PhienChat, { foreignKey: 'MaPhienChat' });
+
 
 
 db.sequelize = sequelize;

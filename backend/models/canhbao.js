@@ -23,6 +23,10 @@ const CanhBao = (sequelize, DataTypes) => {
       allowNull: true,
       defaultValue: DataTypes.NOW,
     },
+    MaPhienChat: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
   }, {
     tableName: 'CanhBao',
     timestamps: false, // Assuming no createdAt/updatedAt columns based on SQL

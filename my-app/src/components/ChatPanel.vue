@@ -28,7 +28,7 @@
           >
             <div v-if="!client.hasRequest">
               <div class="d-flex w-100 justify-content-between">
-                <h6 class="mb-1">{{ client.id || 'Khách mới' }}</h6>
+                <h6 class="mb-1">{{ client.name || 'Khách mới' }}</h6>
                 <small class="text-muted">online</small>
               </div>
               <p class="mb-1 small text-muted">
@@ -38,7 +38,7 @@
 
             <!-- Support Request Actions -->
             <div v-if="client.hasRequest" class="support-request-actions">
-              <h6 class="mb-1 fw-bold">{{ client.id || 'Khách mới' }}</h6>
+              <h6 class="mb-1 fw-bold">{{ client.name || 'Khách mới' }}</h6>
               <p class="mb-2 small text-danger-emphasis">🚨 Cần hỗ trợ gấp!</p>
               <div class="d-flex justify-content-around">
                 <button class="btn btn-sm btn-success" @click.stop="acceptRequest(client)">Đồng ý</button>
@@ -53,7 +53,7 @@
       <div class="col-md-8 d-flex flex-column p-0">
         <div class="chat-header p-3 border-bottom d-flex justify-content-between align-items-center">
           <div>
-            <h6 class="mb-0 fw-bold">{{ activeClient ? activeClient.id : 'Chưa xác thực' }}</h6>
+            <h6 class="mb-0 fw-bold">{{ activeClient ? activeClient.name : 'Chưa xác thực' }}</h6>
             <small class="text-muted" v-if="activeClient">Online via Website</small>
           </div>
         </div>
@@ -120,11 +120,14 @@
 </template>
 
 <script>
+import axios from "axios";
+
 export default {
   name: "ChatPanel",
   data() {
     return {
       ws: null,
+      employee: null, // THÊM DÒNG NÀY
       clients: [],
       activeClient: null,
       chatMessages: [],
@@ -132,38 +135,83 @@ export default {
     };
   },
   mounted() {
-    this.connectWebSocket();
+    // Kiểm tra đăng nhập
+    const savedEmployee = localStorage.getItem('employee');
+    console.log("🔍 Saved employee from localStorage:", savedEmployee); // THÊM LOG
+    
+    if (!savedEmployee) {
+      this.$router.push('/login');
+      return;
+    }
+    
+    try {
+      this.employee = JSON.parse(savedEmployee);
+      console.log("✅ Employee data parsed:", this.employee); // THÊM LOG
+      this.connectWebSocket();
+    } catch (error) {
+      console.error('Error parsing employee data:', error);
+      this.$router.push('/login');
+    }
   },
   methods: {
     connectWebSocket() {
       this.ws = new WebSocket("ws://localhost:3000");
 
       this.ws.onopen = () => {
-        this.ws.send(JSON.stringify({ type: "admin_register" }));
-      };
+        console.log("✅ Admin WebSocket connected as:", this.employee.HoTen);
+        // Gửi employeeId thật
+        this.ws.send(JSON.stringify({ 
+          type: "admin_register",
+          employeeId: this.employee.MaNV // GỬI EMPLOYEE ID THẬT
+        }));
+      },
 
-      this.ws.onmessage = (event) => {
+      this.ws.onmessage = async (event) => {
         const data = JSON.parse(event.data);
 
         if (data.type === "support_request") {
-          this.addOrUpdateClient(data.clientId, true);
+          // Lấy thông tin khách hàng từ API khi có support request
+          await this.addOrUpdateClient(data.clientId, true);
           this.$emit("support-request", data.clientId);
         }
 
         if (data.type === "client_message") {
-          this.addOrUpdateClient(data.clientId);
+          await this.addOrUpdateClient(data.clientId);
           if (this.activeClient && this.activeClient.id === data.clientId) {
             this.chatMessages.push({ text: data.message, isAdmin: false });
           }
         }
       };
     },
-
-    addOrUpdateClient(clientId, hasRequest = false) {
+    
+    async addOrUpdateClient(clientId, hasRequest = false) {
       let client = this.clients.find((c) => c.id === clientId);
+      
       if (!client) {
-        client = { id: clientId, hasRequest: hasRequest };
+        try {
+          // Lấy thông tin khách hàng từ API
+          const response = await axios.get(`http://localhost:3000/api/auth/client/${clientId}`);
+          console.log("✅ Client data from API:", response.data); // THÊM LOG NÀY
+          client = { 
+            id: clientId, 
+            name: response.data.HoTen, // ĐẢM BẢO LÀ HoTen
+            hasRequest: hasRequest 
+          };
+        } catch (error) {
+          console.error("❌ Error fetching client info:", error);
+          // Fallback với dữ liệu cứng
+          const fallbackClients = {
+            '1': { id: '1', name: 'Vân A', hasRequest: hasRequest },
+            '2': { id: '2', name: 'Thi B', hasRequest: hasRequest }
+          };
+          client = fallbackClients[clientId] || { 
+            id: clientId, 
+            name: `Khách ${clientId}`,
+            hasRequest: hasRequest 
+          };
+        }
         this.clients.push(client);
+        console.log("📋 Clients list:", this.clients); // THÊM LOG NÀY
       } else if (hasRequest) {
         client.hasRequest = true;
       }
@@ -193,6 +241,7 @@ export default {
       this.ws.send(JSON.stringify({
         type: "admin_accept_request",
         clientId: client.id,
+        employeeId: this.employee.MaNV // GỬI EMPLOYEE ID
       }));
       client.hasRequest = false;
       this.selectClient(client);
