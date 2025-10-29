@@ -4,12 +4,12 @@
       <h1>Đăng nhập nhân viên</h1>
       <form @submit.prevent="login">
         <div class="form-group">
-          <label for="employeeId">ID nhân viên:</label>
+          <label for="email">Email nhân viên:</label>
           <input 
-            v-model="employeeId" 
+            v-model="email" 
             type="text" 
-            id="employeeId" 
-            placeholder="Nhập ID nhân viên" 
+            id="email" 
+            placeholder="Nhập Email nhân viên" 
           />
         </div>
 
@@ -43,7 +43,7 @@ export default {
   name: 'EmployeeLogin',
   data() {
     return {
-      employeeId: '',
+      email: '',
       password: '',
       isLoading: false,
       errorMessage: ''
@@ -51,8 +51,8 @@ export default {
   },
   methods: {
     async login() {
-      if (!this.employeeId || !this.password) {
-        this.errorMessage = 'Vui lòng nhập ID nhân viên và mật khẩu';
+      if (!this.email || !this.password) {
+        this.errorMessage = 'Vui lòng nhập Email nhân viên và mật khẩu';
         return;
       }
 
@@ -61,7 +61,7 @@ export default {
 
       try {
         const res = await axios.post('http://localhost:3000/api/auth/employee/login', {
-          employeeId: this.employeeId,
+          email: this.email,
           password: this.password
         });
 

@@ -1,5 +1,3 @@
-[file name]: Dashboard.vue
-[file content begin]
 <template>
   <div class="dashboard-container">
     <!-- Header -->
@@ -25,11 +23,10 @@
             <i class="bi bi-exclamation-triangle"></i>
           </div>
           <div class="kpi-info">
-            <h3>24</h3>
+            <h3>{{ totalWarnings }}</h3>
             <p>Cảnh báo trong ngày</p>
           </div>
         </div>
-        <div class="kpi-trend up">+12%</div>
       </div>
 
       <div class="kpi-card info">
@@ -38,37 +35,34 @@
             <i class="bi bi-chat-dots"></i>
           </div>
           <div class="kpi-info">
-            <h3>156</h3>
+            <h3>{{ totalChats }}</h3>
             <p>Hội thoại xử lý</p>
           </div>
         </div>
-        <div class="kpi-trend up">+8%</div>
       </div>
 
       <div class="kpi-card success">
         <div class="kpi-content">
           <div class="kpi-icon">
-            <i class="bi bi-graph-up"></i>
+            <i class="bi bi-people"></i>
           </div>
           <div class="kpi-info">
-            <h3>89%</h3>
-            <p>Tỷ lệ phản hồi</p>
+            <h3>{{ totalCustomers }}</h3>
+            <p>Tổng số khách hàng</p>
           </div>
         </div>
-        <div class="kpi-trend down">-2%</div>
       </div>
 
       <div class="kpi-card primary">
         <div class="kpi-content">
           <div class="kpi-icon">
-            <i class="bi bi-clock-history"></i>
+            <i class="bi bi-envelope"></i>
           </div>
           <div class="kpi-info">
-            <h3>3.2m</h3>
-            <p>Thời gian trung bình</p>
+            <h3>{{ totalMessages }}</h3>
+            <p>Tổng số tin nhắn</p>
           </div>
         </div>
-        <div class="kpi-trend up">+5%</div>
       </div>
     </div>
 
@@ -78,47 +72,21 @@
       <div class="chart-card">
         <div class="chart-header">
           <h4>Phân loại cảnh báo theo nội dung</h4>
-          <div class="chart-actions">
-            <button class="btn-icon">
-              <i class="bi bi-filter"></i>
-            </button>
-            <button class="btn-icon">
-              <i class="bi bi-three-dots"></i>
-            </button>
-          </div>
         </div>
         <div class="chart-content">
           <div class="chart-visual">
             <div class="pie-chart">
-              <div class="pie-segment segment-1"></div>
-              <div class="pie-segment segment-2"></div>
-              <div class="pie-segment segment-3"></div>
-              <div class="pie-segment segment-4"></div>
+              <div v-for="(item, index) in warningTypes" :key="index" :class="'pie-segment segment-' + (index + 1)" :style="{ '--offset': item.offset, '--value': item.value, '--color': item.color }"></div>
               <div class="pie-center">
                 <span>100%</span>
               </div>
             </div>
           </div>
           <div class="chart-legend">
-            <div class="legend-item">
-              <span class="legend-color color-1"></span>
-              <span class="legend-text">Hỗ trợ kỹ thuật</span>
-              <span class="legend-value">45%</span>
-            </div>
-            <div class="legend-item">
-              <span class="legend-color color-2"></span>
-              <span class="legend-text">Khiếu nại</span>
-              <span class="legend-value">30%</span>
-            </div>
-            <div class="legend-item">
-              <span class="legend-color color-3"></span>
-              <span class="legend-text">Tư vấn</span>
-              <span class="legend-value">15%</span>
-            </div>
-            <div class="legend-item">
-              <span class="legend-color color-4"></span>
-              <span class="legend-text">Khác</span>
-              <span class="legend-value">10%</span>
+            <div v-for="(item, index) in warningTypes" :key="index" class="legend-item">
+              <span class="legend-color" :style="{ backgroundColor: item.color }"></span>
+              <span class="legend-text">{{ item.name }}</span>
+              <span class="legend-value">{{ item.value }}%</span>
             </div>
           </div>
         </div>
@@ -127,46 +95,17 @@
       <!-- Phân loại cảnh báo theo kênh -->
       <div class="chart-card">
         <div class="chart-header">
-          <h4>Phân loại cảnh báo theo kênh</h4>
-          <div class="chart-actions">
-            <button class="btn-icon">
-              <i class="bi bi-filter"></i>
-            </button>
-            <button class="btn-icon">
-              <i class="bi bi-three-dots"></i>
-            </button>
-          </div>
+          <h4>Phân phối trạng thái phiên chat</h4>
         </div>
         <div class="chart-content">
           <div class="bar-chart">
             <div class="bar-container">
-              <div class="bar-item">
-                <div class="bar-label">Website</div>
+              <div v-for="(item, index) in chatStatusDistribution" :key="index" class="bar-item">
+                <div class="bar-label">{{ item.TrangThai }}</div>
                 <div class="bar-track">
-                  <div class="bar-fill fill-1" style="width: 40%"></div>
+                  <div class="bar-fill" :style="{ width: item.percentage + '%', backgroundColor: item.color }"></div>
                 </div>
-                <div class="bar-value">40%</div>
-              </div>
-              <div class="bar-item">
-                <div class="bar-label">Facebook</div>
-                <div class="bar-track">
-                  <div class="bar-fill fill-2" style="width: 35%"></div>
-                </div>
-                <div class="bar-value">35%</div>
-              </div>
-              <div class="bar-item">
-                <div class="bar-label">Zalo</div>
-                <div class="bar-track">
-                  <div class="bar-fill fill-3" style="width: 15%"></div>
-                </div>
-                <div class="bar-value">15%</div>
-              </div>
-              <div class="bar-item">
-                <div class="bar-label">Hotline</div>
-                <div class="bar-track">
-                  <div class="bar-fill fill-4" style="width: 10%"></div>
-                </div>
-                <div class="bar-value">10%</div>
+                <div class="bar-value">{{ item.count }}</div>
               </div>
             </div>
           </div>
@@ -182,35 +121,15 @@
           <button class="btn-text">Xem tất cả</button>
         </div>
         <div class="recent-list">
-          <div class="recent-item">
+          <div v-for="activity in recentActivities" :key="activity.MaNhatKy" class="recent-item">
             <div class="recent-icon warning">
               <i class="bi bi-exclamation-triangle"></i>
             </div>
             <div class="recent-content">
-              <p class="recent-title">Khách hàng A cần hỗ trợ kỹ thuật</p>
-              <span class="recent-time">5 phút trước</span>
+              <p class="recent-title">{{ activity.HanhDong }}</p>
+              <span class="recent-time">{{ new Date(activity.ThoiGian).toLocaleString() }}</span>
             </div>
-            <div class="recent-badge">Mới</div>
-          </div>
-          <div class="recent-item">
-            <div class="recent-icon info">
-              <i class="bi bi-chat-dots"></i>
-            </div>
-            <div class="recent-content">
-              <p class="recent-title">Khiếu nại từ khách hàng B</p>
-              <span class="recent-time">15 phút trước</span>
-            </div>
-            <div class="recent-badge">Đang xử lý</div>
-          </div>
-          <div class="recent-item">
-            <div class="recent-icon success">
-              <i class="bi bi-check-circle"></i>
-            </div>
-            <div class="recent-content">
-              <p class="recent-title">Yêu cầu tư vấn sản phẩm</p>
-              <span class="recent-time">1 giờ trước</span>
-            </div>
-            <div class="recent-badge">Hoàn thành</div>
+            <div class="recent-badge">{{ activity.Performer.HoTen }}</div>
           </div>
         </div>
       </div>
@@ -218,10 +137,90 @@
   </div>
 </template>
 
-<script>
-export default {
-  name: 'Dashboard'
-}
+<script setup>
+import { ref, onMounted } from 'vue';
+import axios from 'axios';
+
+const totalChats = ref(0);
+const totalMessages = ref(0);
+const totalCustomers = ref(0);
+const totalWarnings = ref(0);
+const chatsOverTime = ref([]);
+const chatStatusDistribution = ref([]);
+const recentChats = ref([]);
+const topEmployees = ref([]);
+const warningTypes = ref([]);
+const recentActivities = ref([]);
+
+const API_BASE_URL = 'http://localhost:3000/api/dashboard';
+
+const fetchData = async () => {
+  try {
+    const [
+      totalChatsRes,
+      totalMessagesRes,
+      totalCustomersRes,
+      totalWarningsRes,
+      chatsOverTimeRes,
+      chatStatusDistributionRes,
+      recentChatsRes,
+      topEmployeesRes,
+      warningTypesRes,
+      recentActivitiesRes,
+    ] = await Promise.all([
+      axios.get(`${API_BASE_URL}/total-chats`),
+      axios.get(`${API_BASE_URL}/total-messages`),
+      axios.get(`${API_BASE_URL}/total-customers`),
+      axios.get(`${API_BASE_URL}/total-warnings`),
+      axios.get(`${API_BASE_URL}/chats-over-time`),
+      axios.get(`${API_BASE_URL}/chat-status-distribution`),
+      axios.get(`${API_BASE_URL}/recent-chats`),
+      axios.get(`${API_BASE_URL}/top-employees`),
+      axios.get(`${API_BASE_URL}/warning-types`),
+      axios.get(`${API_BASE_URL}/recent-activities`),
+    ]);
+
+    totalChats.value = totalChatsRes.data.totalChats;
+    totalMessages.value = totalMessagesRes.data.totalMessages;
+    totalCustomers.value = totalCustomersRes.data.totalCustomers;
+    totalWarnings.value = totalWarningsRes.data.totalWarnings;
+    chatsOverTime.value = chatsOverTimeRes.data;
+    
+    const statusColors = {
+      'DangCho': '#ffc107',
+      'DangHoatDong': '#17a2b8',
+      'DaKetThuc': '#28a745',
+    };
+    const totalStatusCount = chatStatusDistributionRes.data.reduce((sum, item) => sum + item.count, 0);
+    chatStatusDistribution.value = chatStatusDistributionRes.data.map(item => ({
+      ...item,
+      percentage: totalStatusCount > 0 ? ((item.count / totalStatusCount) * 100).toFixed(2) : 0,
+      color: statusColors[item.TrangThai] || '#ccc',
+    }));
+
+    recentChats.value = recentChatsRes.data;
+    topEmployees.value = topEmployeesRes.data;
+    
+    const warningColors = ['#ffc107', '#17a2b8', '#28a745', '#dc3545'];
+    let offset = 0;
+    warningTypes.value = warningTypesRes.data.map((item, index) => {
+      const currentOffset = offset;
+      offset += item.value;
+      return {
+        ...item,
+        offset: currentOffset,
+        color: warningColors[index % warningColors.length],
+      };
+    });
+
+    recentActivities.value = recentActivitiesRes.data;
+
+  } catch (error) {
+    console.error('Failed to fetch dashboard data:', error);
+  }
+};
+
+onMounted(fetchData);
 </script>
 
 <style scoped>
@@ -419,10 +418,7 @@ export default {
   height: 120px;
   border-radius: 50%;
   background: conic-gradient(
-    #ffc107 0% 45%,
-    #17a2b8 45% 75%,
-    #28a745 75% 90%,
-    #dc3545 90% 100%
+    var(--color) calc(var(--offset) * 1%) calc(var(--value) * 1%)
   );
   position: relative;
 }
@@ -474,11 +470,6 @@ export default {
   border-radius: 4px;
 }
 
-.fill-1 { background: #ffc107; }
-.fill-2 { background: #17a2b8; }
-.fill-3 { background: #28a745; }
-.fill-4 { background: #dc3545; }
-
 .bar-value {
   width: 40px;
   font-size: 0.875rem;
@@ -503,11 +494,6 @@ export default {
   height: 12px;
   border-radius: 2px;
 }
-
-.color-1 { background: #ffc107; }
-.color-2 { background: #17a2b8; }
-.color-3 { background: #28a745; }
-.color-4 { background: #dc3545; }
 
 .legend-text {
   flex: 1;
@@ -619,4 +605,3 @@ export default {
   }
 }
 </style>
-[file content end]

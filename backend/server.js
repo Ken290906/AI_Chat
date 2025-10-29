@@ -12,6 +12,7 @@ import { fileURLToPath } from "url";
 // Import routes and WebSocket
 import nhatKyXuLyRoutes from './routes/nhatkyxuly.js';
 import authRoutes from './routes/auth.js'; // THÊM DÒNG NÀY
+import dashboardRoutes from './routes/dashboard.js'; // Import dashboard routes
 import { setupWebSocket } from './websocket/websocket.js';
 
 dotenv.config();
@@ -74,6 +75,7 @@ app.use(
 app.use(express.json());
 app.use('/api', nhatKyXuLyRoutes);
 app.use('/api/auth', authRoutes); // THÊM DÒNG NÀY
+app.use('/api/dashboard', dashboardRoutes); // Use dashboard routes
 
 const API_URL = "http://localhost:11434/api/generate";
 
@@ -84,11 +86,7 @@ app.post("/api/chat", async (req, res) => {
   try {
     const { message } = req.body;
 
-    const systemPrompt = `Bối cảnh: Bạn là một nhân viên tư vấn nhiệt tình và am hiểu của thương hiệu trà sữa "Tâm Trà". Nhiệm vụ của bạn là dựa vào menu dưới đây để giới thiệu, giải đáp thắc mắc và giúp khách hàng chọn được món đồ uống ưng ý nhất. Hãy luôn giữ giọng văn thân thiện, vui vẻ.
-\n${menuPrompt}
-\nNhiệm vụ: Bây giờ, hãy trả lời câu hỏi của khách hàng dưới đây.
----
-Khách hàng: "${message}"`;
+    const systemPrompt = `Bối cảnh: Bạn là một nhân viên tư vấn nhiệt tình và am hiểu của thương hiệu trà sữa "Tâm Trà". Nhiệm vụ của bạn là dựa vào menu dưới đây để giới thiệu, giải đáp thắc mắc và giúp khách hàng chọn được món đồ uống ưng ý nhất. Hãy luôn giữ giọng văn thân thiện, vui vẻ.\n${menuPrompt}\nNhiệm vụ: Bây giờ, hãy trả lời câu hỏi của khách hàng dưới đây.\n--- Khách hàng: "${message}"`;
 
     console.log("Sending prompt-engineered request to Ollama API...");
 
