@@ -50,14 +50,14 @@ router.get('/employee/:employeeId', async (req, res) => {
 // Route để xác thực nhân viên (fake login)
 router.post('/employee/login', async (req, res) => {
   try {
-    const { employeeId, password } = req.body;
+    const { email, password } = req.body;
     
-    console.log(`🔹 Employee login attempt: ${employeeId}`);
+    console.log(`🔹 Employee login attempt: ${email}`);
     
-    const employee = await db.NhanVien.findByPk(employeeId);
+    const employee = await db.NhanVien.findOne({ where: { Email: email } });
     
     if (!employee || employee.MatKhau !== password) {
-      console.log(`❌ Login failed for employee: ${employeeId}`);
+      console.log(`❌ Login failed for employee: ${email}`);
       return res.status(401).json({ error: 'Sai ID nhân viên hoặc mật khẩu' });
     }
     
