@@ -70,6 +70,8 @@ export default {
         this.$router.push({ name: 'Chat' });
       } else if (tab === 'settings') {
         this.$router.push({ name: 'Settings' });
+      } else if (tab === 'warning') {
+        this.$router.push({ name: 'Warning' });
       }
     },
 

@@ -139,6 +139,22 @@ router.get('/warning-types', async (req, res) => {
   }
 });
 
+// API lấy tất cả cảnh báo
+router.get('/warnings', async (req, res) => {
+  try {
+    const warnings = await db.CanhBao.findAll({
+      include: [{
+        model: db.PhanLoaiCanhBao,
+        attributes: ['PhanLoai']
+      }]
+    });
+    res.json(warnings);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Lỗi khi lấy cảnh báo' });
+  }
+});
+
 // API lấy hoạt động gần đây (từ nhật ký xử lý)
 router.get('/recent-activities', async (req, res) => {
   try {
@@ -151,6 +167,25 @@ router.get('/recent-activities', async (req, res) => {
   } catch (error) {
     console.error("Error fetching recent activities:", error); // Added explicit logging
     res.status(500).json({ error: 'Lỗi khi lấy hoạt động gần đây' });
+  }
+});
+
+// API lấy cảnh báo gần đây cho thông báo
+router.get('/recent-warnings', async (req, res) => {
+  try {
+    const recentWarnings = await db.CanhBao.findAll({
+      limit: 10,
+      order: [['ThoiGianTao', 'DESC']],
+      include: [{
+        model: db.PhanLoaiCanhBao,
+        attributes: ['PhanLoai', 'MucDoUuTien']
+      }],
+      attributes: ['MaCB', 'TenCB', 'ThoiGianTao', 'GhiChu']
+    });
+    res.json(recentWarnings);
+  } catch (error) {
+    console.error("Error fetching recent warnings:", error);
+    res.status(500).json({ error: 'Lỗi khi lấy cảnh báo gần đây' });
   }
 });
 
