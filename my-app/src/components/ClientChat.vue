@@ -129,6 +129,7 @@ export default {
       isAdminChat: false,
       promptCount: 0,
       isAwaitingAdmin: false,
+      chatSessionId: null, // ID phiên chat hiện tại
     };
   },
   watch: {
@@ -290,7 +291,11 @@ export default {
     requestSupport(reason) {
       this.isAdminChat = true;
       this.isAwaitingAdmin = true;
-      this.ws.send(JSON.stringify({ type: "support_request", clientId: this.clientId }));
+      this.ws.send(JSON.stringify({ 
+        type: "support_request", 
+        clientId: this.clientId,
+        chatSessionId: this.chatSessionId
+      }));
       this.messages.push({
         text: reason,
         isUser: false,
@@ -340,7 +345,11 @@ export default {
 
       this.isTyping = true;
       try {
-        const response = await axios.post("http://localhost:3000/api/chat", { message: text });
+        const response = await axios.post("http://localhost:3000/api/chat", { 
+          chatSessionId: this.chatSessionId,
+          clientId: this.clientId,
+          message: text });
+        this.chatSessionId = response.data.chatSessionId;
         this.messages.push({ 
           text: response.data.reply, 
           isUser: false,

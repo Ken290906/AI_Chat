@@ -43,7 +43,7 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(), // SỬA THÀNH createWebHistory (bỏ chữ Web thừa)
+  history: createWebHistory(),
   routes
 })
 

@@ -13,10 +13,17 @@
             @selectTab="handleTabSelect" />
         </div>
 
-        <!-- Use router-view to render components based on the current route -->
         <div class="col p-0">
-          <router-view />
-        </div>
+          
+          <router-view v-slot="{ Component }">
+            <keep-alive include="ChatPanel">
+              <component 
+                :is="Component" 
+                @support-request="handleSupportRequest" 
+              />
+            </keep-alive>
+          </router-view>
+          </div>
       </div>
     </div>
   </div>
@@ -73,9 +80,11 @@ export default {
       }
     },
 
+    // Hàm này giờ sẽ được kích hoạt bởi @support-request
     handleSupportRequest(clientId) {
-      if (this.$refs.toastRef && this.$refs.toastRef.show) {
-        this.$refs.toastRef.show(`📢 Khách hàng ${clientId} cần hỗ trợ gấp!`);
+      console.log(`Layout: Nhận được yêu cầu hỗ trợ từ ${clientId}`);
+      if (this.$refs.toastRef) {
+        this.$refs.toastRef.show(`📢 Khách hàng ${clientId} cần hỗ trợ!`, 'warning', 'Cảnh báo mới');
       } else {
         console.warn('ToastNotification chưa sẵn sàng!');
       }
@@ -85,7 +94,7 @@ export default {
 </script>
 
 <style>
-/* Global styles for ZenChat */
+/* CSS của bạn giữ nguyên */
 :root {
   --primary-color: #4A55A2;
   --accent-color: #C5DFF8;
@@ -94,48 +103,38 @@ export default {
   --text-color: #343a40;
   --border-color: #dee2e6;
 }
-
 body {
   overflow: hidden;
   background-color: var(--background-color);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
-
+/* ... (toàn bộ CSS cũ của bạn) ... */
 #app {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: var(--text-color);
 }
-
 .main-content, .main-content .row {
   height: calc(100vh - 61px);
 }
-
 .sidebar-wrapper {
   transition: width 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   width: 200px;
   flex-shrink: 0;
 }
-
 #app-layout.sidebar-collapsed .sidebar-wrapper {
   width: 60px;
 }
-
 .main-content .row > div {
   height: 100%;
   overflow-y: auto;
 }
-
-/* Đảm bảo các phần tử con chiếm toàn bộ chiều cao */
 .main-content .row.h-100 {
   margin: 0;
 }
-
 .main-content .row.h-100 > div {
   height: 100%;
 }
-
-/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
 }
