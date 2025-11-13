@@ -4,18 +4,12 @@
       <a class="navbar-brand" href="#">
         <img src="../assets/logo.jpg" alt="Tâm Trà Logo" style="height: 50px;">
       </a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
       <div class="collapse navbar-collapse" id="navbarSupportedContent">
-        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-          <!-- Có thể thêm các mục menu khác ở đây -->
-        </ul>
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0"></ul>
         <div class="d-flex align-items-center">
-          <!-- Hiển thị thông tin nhân viên -->
           <div class="employee-info me-3 text-end">
-            <div class="fw-bold small">{{ employee ? employee.HoTen : 'Đang tải...' }}</div>
-            <div class="text-muted extra-small">Mã NV: {{ employee ? employee.MaNV : '...' }}</div>
+            <div class="fw-bold small">{{ employeeName }}</div>
+            <div class="text-muted extra-small">Mã NV: {{ employeeId }}</div>
           </div>
           
           <div class="position-relative">
@@ -24,57 +18,49 @@
               <span v-if="unreadCount > 0" class="notification-badge">{{ unreadCount }}</span>
             </button>
             
-            <!-- Dropdown thông báo -->
             <div v-if="showNotifications" class="notifications-dropdown">
               <div class="notifications-header">
                 <h6 class="mb-0 fw-bold">Thông báo</h6>
-                <button class="btn-close-notifications" @click="toggleNotifications">
-                  <i class="bi bi-x"></i>
-                </button>
-              </div>
-              
-              <div class="notifications-tabs">
-                <button 
-                  :class="['tab-btn', { active: activeTab === 'all' }]"
-                  @click="activeTab = 'all'"
-                >
-                  Tất cả
-                </button>
-                <button 
-                  :class="['tab-btn', { active: activeTab === 'unread' }]"
-                  @click="activeTab = 'unread'"
-                >
-                  Chưa đọc
-                </button>
               </div>
               
               <div class="notifications-list">
-                <div v-if="loading" class="text-center py-4">
-                  <div class="spinner-border spinner-border-sm" role="status">
-                    <span class="visually-hidden">Đang tải...</span>
-                  </div>
-                </div>
-                
-                <div v-else-if="filteredNotifications.length === 0" class="text-center py-4 text-muted">
+                <div v-if="notifications.length === 0" class="text-center py-4 text-muted">
                   <i class="bi bi-bell-slash fs-1 mb-2"></i>
-                  <p class="mb-0">Không có thông báo</p>
+                  <p class="mb-0">Không có thông báo mới</p>
                 </div>
                 
                 <div 
                   v-else
-                  v-for="notification in filteredNotifications" 
-                  :key="notification.MaCB"
+                  v-for="notification in notifications" 
+                  :key="notification.id"
                   class="notification-item"
-                  @click="markAsRead(notification.MaCB)"
+                  :class="{'is-unread': !notification.is_read}"
+                  @click="handleItemClick(notification)"
                 >
+                  <!-- Icon -->
                   <div class="notification-icon">
-                    <i :class="getNotificationIcon(notification.PhanLoaiCanhBao?.MucDoUuTien)"></i>
+                     <img v-if="notification.avatar" :src="notification.avatar" class="rounded-circle" alt="User" style="width: 40px; height: 40px;">
+                     <i v-else class="bi bi-headset fs-4 text-primary"></i>
                   </div>
+                  <!-- Content -->
                   <div class="notification-content">
-                    <div class="notification-title">{{ notification.TenCB }}</div>
-                    <div class="notification-time">{{ formatTime(notification.ThoiGianTao) }}</div>
+                    <div class="notification-title">
+                      <span v-if="notification.type === 'support_request'">
+                        <strong>{{ notification.clientName }}</strong> đang cần hỗ trợ!
+                      </span>
+                      <span v-else>
+                        <strong>{{ notification.name }}</strong>: {{ notification.text }}
+                      </span>
+                    </div>
+                    <div class="notification-time">{{ formatTime(notification.time) }}</div>
                   </div>
-                  <span v-if="!notification.read" class="unread-dot"></span>
+                  <!-- Actions -->
+                  <div class="notification-actions">
+                    <button v-if="notification.type === 'support_request'" class="btn btn-sm btn-primary" @click.stop="$emit('accept-request', notification)">
+                      Đồng ý
+                    </button>
+                    <span v-if="!notification.is_read" class="unread-dot"></span>
+                  </div>
                 </div>
               </div>
               
@@ -88,8 +74,8 @@
               <img src="https://i.pravatar.cc/32" class="rounded-circle" alt="User">
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
-              <li><span class="dropdown-item-text small fw-bold">{{ employee ? employee.HoTen : '' }}</span></li>
-              <li><span class="dropdown-item-text small text-muted">Mã NV: {{ employee ? employee.MaNV : '' }}</span></li>
+              <li><span class="dropdown-item-text small fw-bold">{{ employeeName }}</span></li>
+              <li><span class="dropdown-item-text small text-muted">Mã NV: {{ employeeId }}</span></li>
               <li><hr class="dropdown-divider"></li>
               <li><button class="dropdown-item text-danger" @click="logout"><i class="bi bi-box-arrow-right"></i> Đăng xuất</button></li>
             </ul>
@@ -103,91 +89,53 @@
 <script>
 export default {
   name: 'Header',
+  props: {
+    notifications: {
+      type: Array,
+      default: () => []
+    }
+  },
   data() {
     return {
-      employee: null,
+      employeeName: 'Admin',
+      employeeId: '...',
       showNotifications: false,
-      notifications: [],
-      loading: false,
-      activeTab: 'all',
-      readNotifications: new Set()
     }
   },
   computed: {
     unreadCount() {
-      return this.notifications.filter(n => !this.readNotifications.has(n.MaCB)).length;
-    },
-    filteredNotifications() {
-      if (this.activeTab === 'all') {
-        return this.notifications.map(n => ({
-          ...n,
-          read: this.readNotifications.has(n.MaCB)
-        }));
-      }
-      return this.notifications
-        .filter(n => !this.readNotifications.has(n.MaCB))
-        .map(n => ({ ...n, read: false }));
+      return this.notifications.filter(n => !n.is_read).length;
     }
   },
   mounted() {
     this.loadEmployeeInfo();
-    this.loadNotifications();
-    // Tự động tải lại thông báo mỗi 30 giây
-    this.notificationInterval = setInterval(() => {
-      this.loadNotifications();
-    }, 30000);
+    document.addEventListener('click', this.handleClickOutside);
   },
   beforeUnmount() {
-    if (this.notificationInterval) {
-      clearInterval(this.notificationInterval);
-    }
+    document.removeEventListener('click', this.handleClickOutside);
   },
   methods: {
     loadEmployeeInfo() {
-      // Lấy thông tin nhân viên từ localStorage
       const savedEmployee = localStorage.getItem('employee');
       if (savedEmployee) {
         try {
-          this.employee = JSON.parse(savedEmployee);
-          console.log("✅ Header - Employee info loaded:", this.employee);
+          const employee = JSON.parse(savedEmployee);
+          this.employeeName = employee.HoTen;
+          this.employeeId = employee.MaNV;
         } catch (error) {
-          console.error('❌ Header - Error parsing employee data:', error);
+          console.error('Header - Error parsing employee data:', error);
         }
-      } else {
-        console.warn('⚠️ Header - No employee data found in localStorage');
-      }
-    },
-
-    async loadNotifications() {
-      try {
-        this.loading = true;
-        const response = await fetch('http://localhost:3000/api/dashboard/recent-warnings');
-        if (response.ok) {
-          this.notifications = await response.json();
-        }
-      } catch (error) {
-        console.error('Lỗi khi tải thông báo:', error);
-      } finally {
-        this.loading = false;
       }
     },
 
     toggleNotifications() {
       this.showNotifications = !this.showNotifications;
-      if (this.showNotifications && this.notifications.length === 0) {
-        this.loadNotifications();
-      }
     },
 
-    markAsRead(notificationId) {
-      this.readNotifications.add(notificationId);
-    },
-
-    getNotificationIcon(priority) {
-      switch(priority) {
-        case 1: return 'bi bi-exclamation-circle-fill text-danger';
-        case 2: return 'bi bi-exclamation-triangle-fill text-warning';
-        default: return 'bi bi-info-circle-fill text-info';
+    handleItemClick(notification) {
+      this.$emit('mark-as-read', notification.id);
+      if (notification.type === 'message') {
+        // Optional: navigate to chat on message click
       }
     },
 
@@ -198,293 +146,112 @@ export default {
       const diffMs = now - date;
       const diffMins = Math.floor(diffMs / 60000);
       const diffHours = Math.floor(diffMs / 3600000);
-      const diffDays = Math.floor(diffMs / 86400000);
-      const diffWeeks = Math.floor(diffMs / 604800000);
-
+      
       if (diffMins < 1) return 'Vừa xong';
-      if (diffMins < 60) return `${diffMins} phút`;
-      if (diffHours < 24) return `${diffHours} giờ`;
-      if (diffDays < 7) return `${diffDays} ngày`;
-      if (diffWeeks < 4) return `${diffWeeks} tuần`;
+      if (diffMins < 60) return `${diffMins} phút trước`;
+      if (diffHours < 24) return `${diffHours} giờ trước`;
       return date.toLocaleDateString('vi-VN');
     },
 
     logout() {
-      // Xóa thông tin đăng nhập
       localStorage.removeItem('employee');
-      // Chuyển hướng về trang login
       window.location.href = '/login';
+    },
+
+    handleClickOutside(event) {
+      if (this.$el.contains(event.target)) return;
+      this.showNotifications = false;
     }
   }
 }
 </script>
 
 <style scoped>
-@keyframes pulse-glow {
-  0% {
-    box-shadow: 0 0 0 0 rgba(74, 85, 162, 0.7);
-  }
-  70% {
-    box-shadow: 0 0 10px 15px rgba(74, 85, 162, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(74, 85, 162, 0);
-  }
-}
-
 .navbar {
-  transition: background-color 0.3s ease;
+  height: 70px;
 }
-.navbar-brand {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.brand-icon {
-  font-size: 1.7rem;
-  color: #4A55A2;
-  transition: transform 0.3s ease;
-  border-radius: 50%;
-  padding: 5px;
-  animation: pulse-glow 4s infinite cubic-bezier(0.66, 0, 0, 1);
-}
-.navbar-brand:hover .brand-icon {
-  transform: rotate(360deg);
-  animation-play-state: paused;
-}
-.btn-link {
-  text-decoration: none;
-}
-.btn-link:hover {
-  color: #4A55A2 !important;
-}
-
 .employee-info {
   border-right: 1px solid #dee2e6;
   padding-right: 1rem;
 }
-
 .extra-small {
   font-size: 0.75rem;
 }
-
-/* Đảm bảo dropdown menu có z-index cao */
-.dropdown-menu {
-  z-index: 1060;
-}
-
-/* Notification Badge */
 .notification-badge {
   position: absolute;
-  top: -5px;
-  right: -5px;
-  background: #e41e3f;
+  top: 0px;
+  right: -2px;
+  background: #dc3545;
   color: white;
   font-size: 0.65rem;
   font-weight: bold;
   padding: 2px 6px;
   border-radius: 10px;
-  min-width: 18px;
-  text-align: center;
 }
-
-/* Notifications Dropdown */
 .notifications-dropdown {
   position: absolute;
   top: calc(100% + 10px);
   right: 0;
-  width: 360px;
-  max-height: 600px;
+  width: 400px;
   background: white;
   border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
   z-index: 1070;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
 }
-
-/* Header */
 .notifications-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 16px 12px;
+  padding: 1rem;
   border-bottom: 1px solid #e4e6eb;
 }
-
-.notifications-header h6 {
-  font-size: 1.5rem;
-  color: #050505;
-}
-
-.btn-close-notifications {
-  background: #f0f2f5;
-  border: none;
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.btn-close-notifications:hover {
-  background: #e4e6eb;
-}
-
-.btn-close-notifications i {
-  font-size: 1.25rem;
-  color: #65676b;
-}
-
-/* Tabs */
-.notifications-tabs {
-  display: flex;
-  padding: 0 16px;
-  border-bottom: 1px solid #e4e6eb;
-}
-
-.tab-btn {
-  flex: 1;
-  background: none;
-  border: none;
-  padding: 12px 16px;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: #65676b;
-  cursor: pointer;
-  position: relative;
-  transition: background 0.2s;
-}
-
-.tab-btn:hover {
-  background: #f0f2f5;
-  border-radius: 8px 8px 0 0;
-}
-
-.tab-btn.active {
-  color: #1877f2;
-}
-
-.tab-btn.active::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: #1877f2;
-}
-
-/* Notifications List */
 .notifications-list {
-  flex: 1;
+  max-height: 450px;
   overflow-y: auto;
-  max-height: 400px;
 }
-
-.notifications-list::-webkit-scrollbar {
-  width: 8px;
-}
-
-.notifications-list::-webkit-scrollbar-track {
-  background: #f0f2f5;
-}
-
-.notifications-list::-webkit-scrollbar-thumb {
-  background: #bcc0c4;
-  border-radius: 4px;
-}
-
-.notifications-list::-webkit-scrollbar-thumb:hover {
-  background: #8a8d91;
-}
-
-/* Notification Item */
 .notification-item {
   display: flex;
-  align-items: flex-start;
-  padding: 12px 16px;
-  cursor: pointer;
-  transition: background 0.2s;
-  position: relative;
-  gap: 12px;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  gap: 1rem;
+  transition: background-color 0.2s;
 }
-
-.notification-item:hover {
-  background: #f0f2f5;
-}
-
 .notification-item:not(:last-child) {
-  border-bottom: 1px solid #e4e6eb;
+  border-bottom: 1px solid #f0f0f0;
 }
-
-.notification-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: #f0f2f5;
+.notification-item.is-unread {
+  background-color: #eaf2ff;
+}
+.notification-item:hover {
+  background-color: #f8f9fa;
+  cursor: pointer;
+}
+.notification-content {
+  flex-grow: 1;
+}
+.notification-title {
+  font-size: 0.9rem;
+  color: #333;
+}
+.notification-time {
+  font-size: 0.75rem;
+  color: #6c757d;
+}
+.notification-actions {
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  gap: 0.5rem;
 }
-
-.notification-icon i {
-  font-size: 1.5rem;
-}
-
-.notification-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.notification-title {
-  font-size: 0.9375rem;
-  color: #050505;
-  line-height: 1.3333;
-  margin-bottom: 4px;
-  word-wrap: break-word;
-}
-
-.notification-time {
-  font-size: 0.8125rem;
-  color: #65676b;
-  line-height: 1.2308;
-}
-
 .unread-dot {
-  width: 12px;
-  height: 12px;
-  background: #1877f2;
+  width: 10px;
+  height: 10px;
+  background: #0d6efd;
   border-radius: 50%;
-  flex-shrink: 0;
-  margin-top: 8px;
 }
-
-/* Footer */
 .notifications-footer {
-  padding: 8px;
+  padding: 0.5rem;
   border-top: 1px solid #e4e6eb;
   text-align: center;
 }
-
 .view-all-link {
-  display: block;
-  padding: 8px;
-  color: #1877f2;
-  font-size: 0.9375rem;
-  font-weight: 600;
+  font-size: 0.9rem;
   text-decoration: none;
-  border-radius: 6px;
-  transition: background 0.2s;
-}
-
-.view-all-link:hover {
-  background: #f0f2f5;
-  color: #1877f2;
 }
 </style>
