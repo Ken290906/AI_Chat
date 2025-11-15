@@ -128,9 +128,82 @@ export default {
   methods: {
     handleWsMessage(event) {
         const data = JSON.parse(event.data);
-        if (data.type === "client_message" && this.activeClient && data.clientId === this.activeClient.id) {
-            this.chatMessages.push({ text: data.message, isAdmin: false });
+        if (data.type === "support_request") {
+          // Lấy thông tin khách hàng từ API khi có support request
+          console.log("🔔 Nhận được support request với canhBaoId:", data.canhBaoId);
+          await this.addOrUpdateClient(data.clientId, true, data.canhBaoId);
+          this.$emit("support-request", data.clientId);
         }
+
+        if (data.type === "client_message") {
+          await this.addOrUpdateClient(data.clientId);
+          if (this.activeClient && this.activeClient.id === data.clientId) {
+            this.chatMessages.push({ text: data.message, isAdmin: false });
+          }
+        }
+
+        // --- THAY ĐỔI HOÀN TOÀN KHỐI NÀY ---
+        if (data.type === "request_claimed") {
+          console.log(`🔔 Nhận được 'request_claimed' (CB ID: ${data.canhBaoId}) bởi NV: ${data.acceptedByEmployeeId}`);
+
+          // KIỂM TRA: Nếu *tÔI KHÔNG PHẢI* là người chấp nhận
+          if (data.acceptedByEmployeeId !== this.employee.MaNV) {
+            
+            console.log(`🔹 ${data.acceptedByEmployeeName} đã chấp nhận. Xóa khỏi danh sách của tôi.`);
+            
+            // 1. Xóa client này khỏi mảng 'clients'
+            this.clients = this.clients.filter(c => c.id !== data.clientId);
+
+            // 2. (Phòng hờ) Nếu admin này đang mở cửa sổ chat, đóng nó lại
+            if (this.activeClient && this.activeClient.id === data.clientId) {
+              this.activeClient = null;
+              this.chatMessages = [];
+            }
+            
+          } else {
+            // Nếu TÔI LÀ người chấp nhận, không làm gì cả, 
+            // vì hàm acceptRequest() của tôi đã xử lý UI rồi.
+            console.log("🔹 Xác nhận từ server: Tôi đã chấp nhận yêu cầu này.");
+          }
+        }
+        // --- KẾT THÚC THAY ĐỔI ---
+      };
+    },
+    
+    async addOrUpdateClient(clientId, hasRequest = false, canhBaoId = null) {
+      let client = this.clients.find((c) => c.id === clientId);
+      
+      if (!client) {
+        try {
+          // Lấy thông tin khách hàng từ API
+          const response = await axios.get(`http://localhost:3000/api/auth/client/${clientId}`);
+          console.log("✅ Client data from API:", response.data);
+          client = { 
+            id: clientId, 
+            name: response.data.HoTen, 
+            hasRequest: hasRequest ,
+            canhBaoId: canhBaoId 
+          };
+        } catch (error) {
+          console.error("❌ Error fetching client info:", error);
+          // Fallback với dữ liệu cứng
+          const fallbackClients = {
+            '1': { id: '1', name: 'Vân A', hasRequest: hasRequest },
+            '2': { id: '2', name: 'Thi B', hasRequest: hasRequest }
+          };
+          const fallbackData = fallbackClients[clientId] || { id: clientId, name: `Khách ${clientId}`};
+          client = {
+            ...fallbackData,
+            hasRequest: hasRequest,
+            canhBaoId: canhBaoId // <--- THÊM DÒNG NÀY
+          };
+        }
+        this.clients.push(client);
+        console.log("📋 Clients list:", this.clients); // THÊM LOG NÀY
+      } else if (hasRequest) {
+        client.hasRequest = true;
+        client.canhBaoId = canhBaoId;
+      }
     },
     selectClient(client) {
       this.$emit('select-client', client);
@@ -144,14 +217,36 @@ export default {
       
       const text = this.newMessage.trim();
       this.chatMessages.push({ text, isAdmin: true });
-      
-      this.ws.send(JSON.stringify({
-        type: "admin_message",
-        clientId: this.activeClient.id,
-        message: text,
-      }));
-      
+      this.ws.send(
+        JSON.stringify({
+          type: "admin_message",
+          clientId: this.activeClient.id,
+          message: text,
+        })
+      );
       this.newMessage = "";
+    },
+
+    acceptRequest(client) {
+      this.ws.send(JSON.stringify({
+        type: "admin_accept_request",
+        clientId: client.id,
+        employeeId: this.employee.MaNV, // GỬI EMPLOYEE ID
+        canhBaoId: client.canhBaoId
+      }));
+      client.hasRequest = false;
+      client.canhBaoId = null;
+      this.selectClient(client);
+    },
+
+    declineRequest(client) {
+      this.ws.send(JSON.stringify({
+        type: "admin_decline_request",
+        clientId: client.id,
+        canhBaoId: client.canhBaoId // <--- (Tùy chọn)Gửi về server để biết từ chối cái nào
+      }));
+      client.hasRequest = false;
+      client.canhBaoId = null; 
     },
     getLastMessage(clientId) {
       // This is for display only, would be better to get from a state manager

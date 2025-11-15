@@ -18,9 +18,16 @@
         </div>
 
         <div class="col p-0">
-          <!-- Pass props to the router view -->
-          <router-view :ws="ws" :employee="employee" :clients="clients" :active-client-id="activeClientIdForChat" @select-client="setActiveClient" />
-        </div>
+          
+          <router-view v-slot="{ Component }">
+            <keep-alive include="ChatPanel">
+              <component 
+                :is="Component" 
+                @support-request="handleSupportRequest" 
+              />
+            </keep-alive>
+          </router-view>
+          </div>
       </div>
     </div>
   </div>
@@ -186,6 +193,16 @@ export default {
           this.$router.push({ name: tab.charAt(0).toUpperCase() + tab.slice(1) });
       }
     },
+
+    // Hàm này giờ sẽ được kích hoạt bởi @support-request
+    handleSupportRequest(clientId) {
+      console.log(`Layout: Nhận được yêu cầu hỗ trợ từ ${clientId}`);
+      if (this.$refs.toastRef) {
+        this.$refs.toastRef.show(`📢 Khách hàng ${clientId} cần hỗ trợ!`, 'warning', 'Cảnh báo mới');
+      } else {
+        console.warn('ToastNotification chưa sẵn sàng!');
+      }
+    }
   }
 }
 </script>
@@ -199,39 +216,38 @@ export default {
   --text-color: #343a40;
   --border-color: #dee2e6;
 }
-
 body {
   overflow: hidden;
   background-color: var(--background-color);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
-
+/* ... (toàn bộ CSS cũ của bạn) ... */
 #app {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: var(--text-color);
 }
-
 .main-content, .main-content .row {
   height: calc(100vh - 70px); /* Adjusted for header height */
 }
-
 .sidebar-wrapper {
   transition: width 0.3s ease;
   width: 220px;
   flex-shrink: 0;
 }
-
 #app-layout.sidebar-collapsed .sidebar-wrapper {
   width: 70px;
 }
-
-.main-content .row > .col {
+.main-content .row > div {
   height: 100%;
   overflow-y: auto;
 }
-
-/* Custom scrollbar */
+.main-content .row.h-100 {
+  margin: 0;
+}
+.main-content .row.h-100 > div {
+  height: 100%;
+}
 ::-webkit-scrollbar {
   width: 8px;
 }

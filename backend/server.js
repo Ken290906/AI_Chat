@@ -1,7 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
-import db from './models/index.js';
-import fetch from "node-fetch";
+import db from "./models/index.js";
 import cors from "cors";
 import http from "http";
 import xlsx from "xlsx";
@@ -9,11 +8,12 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-// Import routes and WebSocket
-import nhatKyXuLyRoutes from './routes/nhatkyxuly.js';
-import authRoutes from './routes/auth.js'; // THÊM DÒNG NÀY
-import dashboardRoutes from './routes/dashboard.js'; // Import dashboard routes
-import { setupWebSocket } from './websocket/websocket.js';
+// Import routes và WebSocket
+import chatRoutes from "./routes/chat.js";
+import nhatKyXuLyRoutes from "./routes/nhatkyxuly.js";
+import authRoutes from "./routes/auth.js";
+import dashboardRoutes from "./routes/dashboard.js";
+import { setupWebSocket } from "./websocket/websocket.js";
 
 dotenv.config();
 
@@ -23,10 +23,10 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let menuPrompt = "Hiện tại menu chưa được cập nhật. Vui lòng quay lại sau.";
+export let menuPrompt = "Hiện tại menu chưa được cập nhật. Vui lòng quay lại sau.";
 
 function loadMenuData() {
-  const menuPath = path.resolve(__dirname, '../my-app/src/assets/Menu.xlsx');
+  const menuPath = path.resolve(__dirname, "../my-app/src/assets/Menu.xlsx");
   console.log(`Đang tìm kiếm menu tại: ${menuPath}`);
 
   if (fs.existsSync(menuPath)) {
@@ -38,10 +38,10 @@ function loadMenuData() {
 
       if (menuJson.length > 0) {
         let formattedMenu = "Menu của chúng ta:\n";
-        menuJson.forEach(item => {
-          const name = item['Tên đồ uống'] || 'Tên không xác định';
-          const price = item['Giá'] ? `${item['Giá']}đ` : 'Giá liên hệ';
-          const description = item['Mô tả'] || 'Không có mô tả';
+        menuJson.forEach((item) => {
+          const name = item["Tên đồ uống"] || "Tên không xác định";
+          const price = item["Giá"] ? `${item["Giá"]}đ` : "Giá liên hệ";
+          const description = item["Mô tả"] || "Không có mô tả";
           formattedMenu += `- ${name} (${price}): ${description}\n`;
         });
         menuPrompt = formattedMenu;
@@ -73,49 +73,12 @@ app.use(
 );
 
 app.use(express.json());
-app.use('/api', nhatKyXuLyRoutes);
-app.use('/api/auth', authRoutes); // THÊM DÒNG NÀY
-app.use('/api/dashboard', dashboardRoutes); // Use dashboard routes
 
-const API_URL = "http://localhost:11434/api/generate";
-
-// =========================
-// ✅ PHẦN CHAT VỚI AI (SỬ DỤNG MENU ĐỘNG)
-// =========================
-app.post("/api/chat", async (req, res) => {
-  try {
-    const { message } = req.body;
-
-    const systemPrompt = `Bối cảnh: Bạn là một nhân viên tư vấn nhiệt tình và am hiểu của thương hiệu trà sữa "Tâm Trà". Nhiệm vụ của bạn là dựa vào menu dưới đây để giới thiệu, giải đáp thắc mắc và giúp khách hàng chọn được món đồ uống ưng ý nhất. Hãy luôn giữ giọng văn thân thiện, vui vẻ.\n${menuPrompt}\nNhiệm vụ: Bây giờ, hãy trả lời câu hỏi của khách hàng dưới đây.\n--- Khách hàng: "${message}"`;
-
-    console.log("Sending prompt-engineered request to Ollama API...");
-
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gemma3:4b",
-        prompt: systemPrompt,
-      }),
-    });
-
-    let fullResponse = "";
-    for await (const chunk of response.body) {
-      const text = chunk.toString();
-      try {
-        const json = JSON.parse(text);
-        if (json.response) fullResponse += json.response;
-      } catch {}
-    }
-
-    res.json({ reply: fullResponse.trim() });
-  } catch (error) {
-    console.error("ERROR in /api/chat:", error);
-    res.status(500).json({ error: "Error processing chat request." });
-  }
-});
+// ✅ Gắn routes
+app.use("/api/chat", chatRoutes);
+app.use("/api", nhatKyXuLyRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 // =========================
 // ✅ KHỞI TẠO SERVER VÀ WEBSOCKET
@@ -125,13 +88,14 @@ const server = http.createServer(app);
 // Setup WebSocket
 setupWebSocket(server);
 
-// Kết nối database
-db.sequelize.authenticate()
+// ✅ Kết nối database
+db.sequelize
+  .authenticate()
   .then(() => {
-    console.log('✅ Database connection has been established successfully.');
+    console.log("✅ Database connection has been established successfully.");
   })
-  .catch(err => {
-    console.error('❌ Unable to connect to the database:', err);
+  .catch((err) => {
+    console.error("❌ Unable to connect to the database:", err);
   });
 
 const port = process.env.PORT || 3000;
