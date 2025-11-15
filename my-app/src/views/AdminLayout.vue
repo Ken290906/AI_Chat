@@ -1,7 +1,11 @@
 <template>
   <div id="app-layout" :class="{'sidebar-collapsed': !isSidebarOpen}">
-    <Header @toggle-notifications="toggleToast" />
-    <ToastNotification ref="toastRef" :show="showToast" @close="showToast = false" />
+    <Header 
+      :notifications="notifications"
+      @accept-request="handleAcceptRequest"
+      @mark-as-read="handleMarkAsRead"
+    />
+    <ToastNotification ref="toastRef" />
 
     <div class="main-content container-fluid">
       <div class="row flex-nowrap">
@@ -30,53 +34,163 @@
 </template>
 
 <script>
+import axios from "axios";
 import Header from '../components/Header.vue'
 import Sidebar from '../components/Sidebar.vue'
-import ChatPanel from '../components/ChatPanel.vue'
-import InfoPanel from '../components/InfoPanel.vue'
 import ToastNotification from '../components/ToastNotification.vue'
-import Dashboard from '../components/Dashboard.vue'
-// SettingsLayout import removed
 
 export default {
   name: 'AdminLayout',
   components: {
     Header,
     Sidebar,
-    ChatPanel,
-    InfoPanel,
     ToastNotification,
-    Dashboard
-    // SettingsLayout component registration removed
   },
   data() {
     return {
-      showToast: false,
+      ws: null,
+      employee: null,
+      clients: [],
+      notifications: [],
+      activeClientIdForChat: null,
       isSidebarOpen: true,
-      activeTab: 'chat' // Mặc định hiển thị chat
+      activeTab: 'chat'
+    }
+  },
+  mounted() {
+    const savedEmployee = localStorage.getItem('employee');
+    if (!savedEmployee) {
+      this.$router.push('/login');
+      return;
+    }
+    try {
+      this.employee = JSON.parse(savedEmployee);
+      this.connectWebSocket();
+    } catch (error) {
+      console.error('Error parsing employee data:', error);
+      this.$router.push('/login');
     }
   },
   methods: {
-    toggleToast() {
-      this.showToast = !this.showToast;
-      if (this.showToast) {
-        setTimeout(() => {
-          this.showToast = false;
-        }, 5000);
+    connectWebSocket() {
+      this.ws = new WebSocket("ws://localhost:3000");
+
+      this.ws.onopen = () => {
+        console.log("✅ Admin WebSocket connected as:", this.employee.HoTen);
+        this.ws.send(JSON.stringify({ 
+          type: "admin_register",
+          employeeId: this.employee.MaNV
+        }));
+      };
+
+      this.ws.onmessage = async (event) => {
+        const data = JSON.parse(event.data);
+        console.log("WebSocket message received in AdminLayout:", data);
+
+        if (data.type === "support_request") {
+          const client = await this.addOrUpdateClient(data.clientId, true);
+          if (client) {
+            // Show toast
+            this.$refs.toastRef.show(
+              `Khách hàng ${client.name || data.clientId} cần hỗ trợ.`,
+              'warning', // type
+              'Yêu cầu hỗ trợ mới' // title
+            );
+            // Add to notification center
+            this.notifications.unshift({
+              id: `req_${data.clientId}_${Date.now()}`,
+              type: 'support_request',
+              clientId: data.clientId,
+              clientName: client.name || 'Khách mới',
+              avatar: `https://i.pravatar.cc/40?u=${data.clientId}`,
+              time: new Date(),
+              is_read: false,
+            });
+          }
+        }
+
+        if (data.type === "client_message") {
+          const client = await this.addOrUpdateClient(data.clientId);
+           if (client) {
+            this.notifications.unshift({
+              id: `msg_${data.clientId}_${Date.now()}`,
+              type: 'message',
+              clientId: data.clientId,
+              name: client.name,
+              text: data.message,
+              avatar: `https://i.pravatar.cc/40?u=${data.clientId}`,
+              time: new Date(),
+              is_read: false,
+            });
+          }
+        }
+      };
+    },
+
+    async addOrUpdateClient(clientId, hasRequest = false) {
+      let client = this.clients.find((c) => c.id === clientId);
+      if (!client) {
+        try {
+          const response = await axios.get(`http://localhost:3000/api/auth/client/${clientId}`);
+          client = { 
+            id: clientId, 
+            name: response.data.HoTen,
+            hasRequest: hasRequest 
+          };
+          this.clients.push(client);
+        } catch (error) {
+          console.error("Error fetching client info:", error);
+          client = { id: clientId, name: `Khách ${clientId}`, hasRequest: hasRequest };
+          this.clients.push(client);
+        }
+      } else if (hasRequest) {
+        client.hasRequest = true;
+      }
+      return client;
+    },
+
+    handleAcceptRequest(notification) {
+      const client = this.clients.find(c => c.id === notification.clientId);
+      if (client) {
+        this.ws.send(JSON.stringify({
+          type: "admin_accept_request",
+          clientId: client.id,
+          employeeId: this.employee.MaNV
+        }));
+        client.hasRequest = false;
+        
+        // Remove notification from list
+        this.notifications = this.notifications.filter(n => n.id !== notification.id);
+        
+        // Navigate to chat and set active client
+        this.activeClientIdForChat = client.id;
+        this.$router.push({ name: 'Chat' }).catch(err => {
+            if (err.name !== 'NavigationDuplicated') {
+                console.error(err);
+            }
+        });
       }
     },
+    
+    handleMarkAsRead(notificationId) {
+      const notification = this.notifications.find(n => n.id === notificationId);
+      if (notification) {
+        notification.is_read = true;
+      }
+    },
+
+    setActiveClient(client) {
+        this.activeClientIdForChat = client.id;
+    },
+
     toggleSidebar() {
       this.isSidebarOpen = !this.isSidebarOpen;
     },
+
     handleTabSelect(tab) {
       this.activeTab = tab;
-      // Navigate to the corresponding route
-      if (tab === 'dashboard') {
-        this.$router.push({ name: 'Dashboard' });
-      } else if (tab === 'chat') {
-        this.$router.push({ name: 'Chat' });
-      } else if (tab === 'settings') {
-        this.$router.push({ name: 'Settings' });
+      if (this.$route.name?.toLowerCase() !== tab) {
+          this.$router.push({ name: tab.charAt(0).toUpperCase() + tab.slice(1) });
       }
     },
 
@@ -94,7 +208,6 @@ export default {
 </script>
 
 <style>
-/* CSS của bạn giữ nguyên */
 :root {
   --primary-color: #4A55A2;
   --accent-color: #C5DFF8;
@@ -115,15 +228,15 @@ body {
   color: var(--text-color);
 }
 .main-content, .main-content .row {
-  height: calc(100vh - 61px);
+  height: calc(100vh - 70px); /* Adjusted for header height */
 }
 .sidebar-wrapper {
-  transition: width 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  width: 200px;
+  transition: width 0.3s ease;
+  width: 220px;
   flex-shrink: 0;
 }
 #app-layout.sidebar-collapsed .sidebar-wrapper {
-  width: 60px;
+  width: 70px;
 }
 .main-content .row > div {
   height: 100%;

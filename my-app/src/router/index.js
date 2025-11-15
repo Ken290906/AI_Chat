@@ -27,6 +27,11 @@ const routes = [
         path: 'settings',
         name: 'Settings',
         component: AccessLog
+      },
+      {
+        path: 'warning',
+        name: 'Warning',
+        component: () => import('../components/WarningTable.vue')
       }
     ]
   },

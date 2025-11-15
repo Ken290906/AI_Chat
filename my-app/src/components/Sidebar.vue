@@ -54,6 +54,16 @@
           </transition>
         </a>
       </li>
+      <li>
+        <a href="#" 
+          :class="['nav-link', {'justify-content-center': !isOpen, 'active': activeTab === 'warning'}]"
+          @click.prevent="setActiveTab('warning')">
+          <i class="bi bi-exclamation-triangle me-2"></i>
+          <transition name="fade-slide">
+            <span v-show="isOpen">Cảnh báo</span>
+          </transition>
+        </a>
+      </li>
     </ul>
     <hr>
     <div class="nav-item">
