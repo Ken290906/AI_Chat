@@ -22,7 +22,12 @@
           <router-view v-slot="{ Component }">
             <keep-alive include="ChatPanel">
               <component 
-                :is="Component" 
+                :is="Component"
+                :ws="ws"
+                :employee="employee"
+                :clients="clients"
+                :active-client-id="activeClientIdForChat"
+                @select-client="setActiveClient"
                 @support-request="handleSupportRequest" 
               />
             </keep-alive>
@@ -88,7 +93,8 @@ export default {
         console.log("WebSocket message received in AdminLayout:", data);
 
         if (data.type === "support_request") {
-          const client = await this.addOrUpdateClient(data.clientId, true);
+          // Thêm canhBaoId vào client object khi có support request
+          const client = await this.addOrUpdateClient(data.clientId, true, data.canhBaoId);
           if (client) {
             // Show toast
             this.$refs.toastRef.show(
@@ -101,6 +107,7 @@ export default {
               id: `req_${data.clientId}_${Date.now()}`,
               type: 'support_request',
               clientId: data.clientId,
+              canhBaoId: data.canhBaoId, // <-- LƯU LẠI CanhBaoID
               clientName: client.name || 'Khách mới',
               avatar: `https://i.pravatar.cc/40?u=${data.clientId}`,
               time: new Date(),
@@ -127,7 +134,7 @@ export default {
       };
     },
 
-    async addOrUpdateClient(clientId, hasRequest = false) {
+    async addOrUpdateClient(clientId, hasRequest = false, canhBaoId = null) {
       let client = this.clients.find((c) => c.id === clientId);
       if (!client) {
         try {
@@ -135,16 +142,18 @@ export default {
           client = { 
             id: clientId, 
             name: response.data.HoTen,
-            hasRequest: hasRequest 
+            hasRequest: hasRequest,
+            canhBaoId: canhBaoId // <-- LƯU LẠI CanhBaoID
           };
           this.clients.push(client);
         } catch (error) {
           console.error("Error fetching client info:", error);
-          client = { id: clientId, name: `Khách ${clientId}`, hasRequest: hasRequest };
+          client = { id: clientId, name: `Khách ${clientId}`, hasRequest: hasRequest, canhBaoId: canhBaoId };
           this.clients.push(client);
         }
       } else if (hasRequest) {
         client.hasRequest = true;
+        client.canhBaoId = canhBaoId; // <-- CẬP NHẬT CanhBaoID
       }
       return client;
     },
@@ -155,7 +164,8 @@ export default {
         this.ws.send(JSON.stringify({
           type: "admin_accept_request",
           clientId: client.id,
-          employeeId: this.employee.MaNV
+          employeeId: this.employee.MaNV,
+          canhBaoId: notification.canhBaoId // <-- GỬI ĐI CanhBaoID
         }));
         client.hasRequest = false;
         

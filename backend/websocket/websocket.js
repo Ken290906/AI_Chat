@@ -115,15 +115,17 @@ export function setupWebSocket(server) {
       if (data.type === "support_request") {
         console.log(`🚨 Support request from client: ${data.clientId}`)
         
-        const phienChatId = data.chatSessionId 
+        let phienChatId = data.chatSessionId 
         const clientId = data.clientId
 
-        if (!phienChatId) {
-            console.error("❌ Bỏ qua support_request: Client không gửi chatSessionId");
-            return;
-        }
-
         try {
+          // Nếu không có phiên chat, hãy tạo một phiên mới
+          if (!phienChatId) {
+            console.log(`🔹 support_request không có chatSessionId. Tạo phiên chat mới...`);
+            const newSession = await ChatService.CreateChatSession(clientId, null, null); // Chưa có nhân viên nào chấp nhận
+            phienChatId = newSession.MaPhienChat;
+            console.log(`✅ Đã tạo phiên chat mới: ${phienChatId}`);
+          }
           const canhBao = await ChatService.createWarning(
             phienChatId, clientId, "need support",
             `Khách ${clientId} chủ động yêu cầu hỗ trợ`

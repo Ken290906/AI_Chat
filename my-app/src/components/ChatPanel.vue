@@ -126,7 +126,7 @@ export default {
     }
   },
   methods: {
-    handleWsMessage(event) {
+    async handleWsMessage(event) {
         const data = JSON.parse(event.data);
         if (data.type === "support_request") {
           // Lấy thông tin khách hàng từ API khi có support request
@@ -167,7 +167,6 @@ export default {
           }
         }
         // --- KẾT THÚC THAY ĐỔI ---
-      };
     },
     
     async addOrUpdateClient(clientId, hasRequest = false, canhBaoId = null) {
