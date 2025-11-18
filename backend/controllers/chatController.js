@@ -40,10 +40,10 @@ export const chatWithAI = async (req, res) => {
       }
     }
     // --- KẾT THÚC LOGIC PHIÊN CHAT ---
-    
+
     await ChatService.saveMessage(sessionId, message, "KhachHang");
 
-    const systemPrompt = `...`; // (Giữ nguyên)
+    const systemPrompt = `Bối cảnh: Bạn là một nhân viên tư vấn nhiệt tình và am hiểu của thương hiệu trà sữa "Tâm Trà". Nhiệm vụ của bạn là dựa vào menu dưới đây để giới thiệu, giải đáp thắc mắc và giúp khách hàng chọn được món đồ uống ưng ý nhất. Hãy luôn giữ giọng văn thân thiện, vui vẻ.\n${menuPrompt}\nNhiệm vụ: Bây giờ, hãy trả lời câu hỏi của khách hàng dưới đây.\n--- Khách hàng: "${message}"`;
 
     const response = await fetch("http://localhost:11434/api/generate", {
       method: "POST",
