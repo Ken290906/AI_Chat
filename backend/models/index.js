@@ -12,6 +12,7 @@ import PhienChatModel from './phienchat.js';
 import NhatKyXuLyModel from './nhatkyxuly.js';
 import TinNhanModel from './tinnhan.js';
 import SoThichModel from './sothich.js';
+import TomTatPhienChatModel from './tomtatphienchat.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,6 +38,7 @@ db.PhienChat = PhienChatModel(sequelize, DataTypes);
 db.NhatKyXuLy = NhatKyXuLyModel(sequelize, DataTypes);
 db.TinNhan = TinNhanModel(sequelize, DataTypes);
 db.SoThich = SoThichModel(sequelize, DataTypes);
+db.TomTatPhienChat = TomTatPhienChatModel(sequelize, DataTypes);
 
 // Apply associations
 // PhanLoaiCanhBao and CanhBao
@@ -76,6 +78,10 @@ db.SoThich.belongsTo(db.KhachHang, {
   foreignKey: 'MaKH',
   onDelete: 'CASCADE' 
 });
+
+// PhienChat và TomTatPhienChat
+db.PhienChat.hasOne(db.TomTatPhienChat, { foreignKey: 'MaPhienChat', as: 'TomTat' });
+db.TomTatPhienChat.belongsTo(db.PhienChat, { foreignKey: 'MaPhienChat' });
  
 
 
