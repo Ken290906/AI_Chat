@@ -40,14 +40,11 @@ export const chatWithAI = async (req, res) => {
       }
     }
     // --- KẾT THÚC LOGIC PHIÊN CHAT ---
-    // ✅ Giờ chúng ta đã chắc chắn có `sessionId` (là MaPhienChat của phiên AI)
-
-    // ✅ Lưu tin nhắn khách (giữ nguyên)
+    
     await ChatService.saveMessage(sessionId, message, "KhachHang");
 
     const systemPrompt = `...`; // (Giữ nguyên)
 
-    // ... (Phần gọi API AI giữ nguyên)
     const response = await fetch("http://localhost:11434/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

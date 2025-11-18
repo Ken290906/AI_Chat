@@ -11,6 +11,7 @@ import NhanVienModel from './nhanvien.js';
 import PhienChatModel from './phienchat.js';
 import NhatKyXuLyModel from './nhatkyxuly.js';
 import TinNhanModel from './tinnhan.js';
+import SoThichModel from './sothich.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,6 +36,7 @@ db.NhanVien = NhanVienModel(sequelize, DataTypes);
 db.PhienChat = PhienChatModel(sequelize, DataTypes);
 db.NhatKyXuLy = NhatKyXuLyModel(sequelize, DataTypes);
 db.TinNhan = TinNhanModel(sequelize, DataTypes);
+db.SoThich = SoThichModel(sequelize, DataTypes);
 
 // Apply associations
 // PhanLoaiCanhBao and CanhBao
@@ -65,6 +67,16 @@ db.TinNhan.belongsTo(db.PhienChat, { foreignKey: 'MaPhienChat' });
 db.PhienChat.hasMany(db.CanhBao, { foreignKey: 'MaPhienChat' });
 db.CanhBao.belongsTo(db.PhienChat, { foreignKey: 'MaPhienChat' });
 
+// KhachHang and SoThich
+db.KhachHang.hasOne(db.SoThich, { 
+  foreignKey: 'MaKH',
+  as: 'SoThich' 
+});
+db.SoThich.belongsTo(db.KhachHang, { 
+  foreignKey: 'MaKH',
+  onDelete: 'CASCADE' 
+});
+ 
 
 
 db.sequelize = sequelize;

@@ -25,7 +25,7 @@
                 <small class="text-muted">online</small>
               </div>
               <p class="mb-1 small text-muted">
-                {{ getLastMessage(client.id) || 'Chưa có tin nhắn' }}
+                {{ getLastMessage(client.id) }}
               </p>
             </div>
           </a>
@@ -56,7 +56,7 @@
 
           <template v-else>
             <div
-              v-for="(msg, idx) in chatMessages"
+              v-for="(msg, idx) in activeChatMessages"
               :key="idx"
               :class="['d-flex', msg.isAdmin ? 'justify-content-end' : 'justify-content-start', 'mb-3', 'message-animation']"
             >
@@ -113,9 +113,26 @@ export default {
   data() {
     return {
       activeClient: null,
-      chatMessages: [],
+      // SỬA LỖI LOGIC: Dùng 1 object để lưu TẤT CẢ hội thoại
+      allConversations: {}, // Ví dụ: { 'client-1': [msg1, msg2], 'client-2': [msg3] }
       newMessage: "",
     };
+  },
+  // SỬA LỖI LOGIC: Thêm computed property
+  computed: {
+    /**
+     * Tự động trả về mảng tin nhắn của client đang được chọn
+     */
+    activeChatMessages() {
+      if (!this.activeClient) {
+        return [];
+      }
+      // Nếu chưa có mảng tin nhắn cho client này, hãy tạo một mảng rỗng
+      if (!this.allConversations[this.activeClient.id]) {
+        this.allConversations[this.activeClient.id] = [];
+      }
+      return this.allConversations[this.activeClient.id];
+    }
   },
   watch: {
     activeClientId: {
@@ -123,7 +140,8 @@ export default {
       handler(newId) {
         if (newId) {
           this.activeClient = this.clients.find(c => c.id === newId);
-          this.loadMessageHistory(); // You would load history here
+          // SỬA LỖI LOGIC: Truyền Id vào
+          this.loadMessageHistory(newId);
         } else {
           this.activeClient = null;
         }
@@ -147,23 +165,25 @@ export default {
     async handleWsMessage(event) {
         const data = JSON.parse(event.data);
         
-        // 1. Chỉ xử lý tin nhắn client (để cập nhật cửa sổ chat)
+        // SỬA LỖI LOGIC: Lưu tin nhắn vào đúng mảng hội thoại
         if (data.type === "client_message") {
-          if (this.activeClient && this.activeClient.id === data.clientId) {
-            this.chatMessages.push({ text: data.message, isAdmin: false });
+          const clientId = data.clientId;
+          // Đảm bảo mảng tồn tại
+          if (!this.allConversations[clientId]) {
+             this.allConversations[clientId] = [];
           }
+          // Thêm tin nhắn vào mảng của client đó
+          this.allConversations[clientId].push({ text: data.message, isAdmin: false });
         }
 
         // 2. Xử lý khi admin khác "claim" mất client
         if (data.type === "request_claimed") {
-          // Kiểm tra xem có phải TÔI đang xem client đó không
           if (this.activeClient && this.activeClient.id === data.clientId) {
-            // Và người claim KHÔNG PHẢI là tôi
             if (data.acceptedByEmployeeId !== this.employee.MaNV) {
               console.log(`🔹 (ChatPanel) ${data.acceptedByEmployeeName} đã chấp nhận. Tự động đóng cửa sổ chat này.`);
-              // Đóng cửa sổ chat (reset local state)
               this.activeClient = null;
-              this.chatMessages = [];
+              // mảng 'allConversations[data.clientId]' vẫn được giữ
+              // nhưng 'activeChatMessages' sẽ trả về []
             }
           }
         }
@@ -172,47 +192,65 @@ export default {
     selectClient(client) {
       this.$emit('select-client', client);
     },
-    loadMessageHistory() {
-      // In a real app, you'd fetch this from an API
-      this.chatMessages = []; 
+    
+    // SỬA LỖI LOGIC: Cập nhật hàm này
+    loadMessageHistory(clientId) {
+      // Trong ứng dụng thật, bạn sẽ gọi API tại đây
+      // Ví dụ: this.allConversations[clientId] = await axios.get(...)
+      
+      // Hiện tại, chúng ta chỉ cần đảm bảo mảng tồn tại
+      if (clientId && !this.allConversations[clientId]) {
+        this.allConversations[clientId] = [];
+      }
+      // KHÔNG còn `this.chatMessages = []`
     },
+    
     sendMessage() {
       if (!this.newMessage.trim() || !this.activeClient || !this.ws) return;
       
       const text = this.newMessage.trim();
-      this.chatMessages.push({ text, isAdmin: true });
+      const clientId = this.activeClient.id;
+
+      // SỬA LỖI LOGIC: Thêm tin nhắn vào đúng mảng hội thoại
+      this.allConversations[clientId].push({ text, isAdmin: true });
+      
       this.ws.send(
         JSON.stringify({
           type: "admin_message",
-          clientId: this.activeClient.id,
+          clientId: clientId,
           message: text,
         })
       );
       this.newMessage = "";
     },
     
+    // SỬA LỖI LOGIC: Lấy tin nhắn cuối cùng từ 'allConversations'
     getLastMessage(clientId) {
-      // This is for display only, would be better to get from a state manager
-      return null;
+      const conversation = this.allConversations[clientId];
+      if (!conversation || conversation.length === 0) {
+        return 'Chưa có tin nhắn'; // Trả về tin nhắn mặc định
+      }
+      // Trả về nội dung text của tin nhắn cuối cùng
+      const lastMsg = conversation[conversation.length - 1];
+      return lastMsg.isAdmin ? `Bạn: ${lastMsg.text}` : lastMsg.text;
     },
   },
 };
 </script>
 
 <style scoped>
-/* Định nghĩa các biến CSS (nếu chưa có trong file CSS chung) */
+/* Toàn bộ CSS GIAO DIỆN MỚI của bạn được giữ nguyên */
 :root {
-  --primary-color: #4A55A2; /* Màu xanh đậm */
-  --background-color: #f0f2f5; /* Nền xám nhạt */
-  --sidebar-bg: #ffffff; /* Nền sidebar/header trắng */
-  --border-color: #dee2e6; /* Màu đường viền */
+  --primary-color: #4A55A2;
+  --background-color: #f0f2f5;
+  --sidebar-bg: #ffffff;
+  --border-color: #dee2e6;
 }
 
 .chat-panel, .row {
   height: 100%;
 }
 
-/* --- Style cho danh sách (Giữ nguyên) --- */
 .list-group-item.active {
   background-color: var(--primary-color);
   color: white;
@@ -222,18 +260,15 @@ export default {
     color: rgba(255, 255, 255, 0.7) !important;
 }
 
-/* --- Style Header (Mới, từ ClientChat) --- */
 .chat-header {
-  background-color: var(--sidebar-bg); /* Nền trắng */
-  height: 70px; /* Chiều cao cố định */
+  background-color: var(--sidebar-bg);
+  height: 70px;
 }
 
-/* --- Style Body (Cập nhật) --- */
 .chat-body {
-  background-color: var(--background-color); /* Nền xám nhạt */
+  background-color: var(--background-color);
 }
 
-/* --- Animation (Mới, từ ClientChat) --- */
 @keyframes message-fade-in {
   from {
     opacity: 0;
@@ -248,75 +283,69 @@ export default {
   animation: message-fade-in 0.5s ease-out;
 }
 
-/* --- Message Bubbles (Cập nhật & Đảo ngược) --- */
 .message-bubble {
-  padding: 12px 20px; /* Kích thước padding */
-  border-radius: 20px; /* Bo tròn */
-  max-width: 75%; /* Chiều rộng tối đa */
-  line-height: 1.5; /* Khoảng cách dòng */
-  font-size: 0.95rem; /* Kích thước font */
-  word-wrap: break-word; /* Tự động xuống dòng */
+  padding: 12px 20px;
+  border-radius: 20px;
+  max-width: 75%;
+  line-height: 1.5;
+  font-size: 0.95rem;
+  word-wrap: break-word;
 }
 
-/* Tin nhắn Admin (Phải) - Dùng style agent-message của ClientChat */
-/* Đổi màu: Admin là màu xanh gradient */
 .user-message {
-  background: linear-gradient(to right, #4A55A2, #7895CB); /* Gradient xanh đậm */
+  background: linear-gradient(to right, #4A55A2, #7895CB);
   color: white;
-  border-bottom-right-radius: 5px; /* Bo góc dưới bên phải ít hơn */
+  border-bottom-right-radius: 5px;
 }
 
-/* Tin nhắn Client (Trái) - Dùng style user-message của ClientChat */
-/* Đổi màu: Khách là màu xám */
 .agent-message {
-  background-color: #e9ecef; /* Nền xám nhạt */
-  color: #333; /* Màu chữ đen */
-  border-bottom-left-radius: 5px; /* Bo góc dưới bên trái ít hơn */
+  background-color: #e9ecef;
+  color: #333;
+  border-bottom-left-radius: 5px;
 }
 
-/* --- Chat Footer (Mới, từ ClientChat) --- */
 .chat-footer {
-  background-color: var(--sidebar-bg); /* Nền trắng */
-  border-top: 1px solid var(--border-color); /* Viền trên */
-  padding: 1rem 1.5rem 1.5rem 1.5rem; /* Padding */
+  background-color: var(--sidebar-bg);
+  border-top: 1px solid var(--border-color);
+  padding: 1rem 1.5rem 1.5rem 1.5rem;
 }
 
 .chat-footer .input-group {
-  align-items: center; /* Căn giữa theo chiều dọc */
+  align-items: center;
 }
 
 .chat-footer .form-control {
-  background-color: var(--background-color); /* Nền input xám nhạt */
-  border-radius: 1rem !important; /* Bo tròn mạnh */
+  background-color: var(--background-color);
+  border-radius: 1rem !important;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
-  border: 0; /* Bỏ viền */
-  padding: 0.75rem 1rem; /* Padding input */
+  border: 0;
+  padding: 0.75rem 1rem;
 }
 
 .chat-footer .form-control:focus {
-  box-shadow: 0 0 0 0.25rem rgba(74, 85, 162, 0.25); /* Hiệu ứng focus */
+  box-shadow: 0 0 0 0.25rem rgba(74, 85, 162, 0.25);
   border-color: var(--primary-color);
 }
 
 .btn-outline-secondary.border-0 {
-  color: #6c757d; /* Màu icon */
+  color: #6c757d;
 }
 
 .btn-primary-custom {
-  background-color: var(--primary-color); /* Màu nền nút gửi */
-  color: white; /* Màu chữ/icon nút gửi */
-  border-radius: 50% !important; /* Nút hình tròn */
+  background-color: var(--primary-color);
+  color: white;
+  border-radius: 50% !important;
   width: 40px;
   height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: background-color 0.3s ease;
-  margin-left: 8px; /* Khoảng cách với input */
-  border: none; /* Bỏ viền */
+  margin-left: 8px;
+  border: none;
 }
 
 .btn-primary-custom:hover {
-  background-color: #3a448a; /* Màu hover */
+  background-color: #3a448a;
 }
 </style>

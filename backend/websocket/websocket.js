@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from "ws"
 import db from "../models/index.js"
 import ChatService from "../services/chatService.js"
+import AIService from "../services/aiService.js"
 
 // ===== THAY ĐỔI 1: Quản lý Sockets ở phạm vi module =====
 // Chuyển các biến này ra ngoài để notifyAdmin có thể truy cập
@@ -415,7 +416,7 @@ export function setupWebSocket(server) {
         }
       }
 
-      if (disconnectedClientId) {
+      if (disconnectedClientId) {  
         try {
           console.log(`🔹 Tìm các phiên 'DangHoatDong' cho MaKH: ${disconnectedClientId}`)
           const activeSessions = await db.PhienChat.findAll({
@@ -426,6 +427,7 @@ export function setupWebSocket(server) {
           for (const phienChat of activeSessions) {
             await ChatService.endChatSession(phienChat.MaPhienChat)
             console.log(`✅ Đã tự động đóng phiên chat ${phienChat.MaPhienChat}`)
+            AIService.updateCustomerPreferences(phienChat.MaPhienChat);
           }
           
           if (currentChatSession && currentChatSession.MaKH === disconnectedClientId) {
