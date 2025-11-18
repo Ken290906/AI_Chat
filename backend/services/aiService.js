@@ -83,6 +83,78 @@ const AIService = {
     } catch (error) {
       console.error("❌ Lỗi khi AI tổng hợp sở thích:", error.message);
     }
+  },
+  // --- HÀM 2: TÓM TẮT PHIÊN CHAT (MỚI) ---
+  async summarizeSession(chatSessionId) {
+    try {
+      console.log(`📝 AI đang tóm tắt nội dung phiên chat: ${chatSessionId}...`);
+
+      const phienChat = await db.PhienChat.findByPk(chatSessionId, {
+        include: [{
+            model: db.TinNhan,
+            attributes: ['NguoiGui', 'NoiDung'],
+            order: [['ThoiGianGui', 'ASC']]
+        }]
+      });
+
+      if (!phienChat || !phienChat.TinNhans.length) return;
+
+      // Chuẩn bị nội dung hội thoại
+      const chatHistoryText = phienChat.TinNhans.map(msg => {
+        const sender = msg.NguoiGui === 'KhachHang' ? 'Khách' : 'Nhân viên/AI';
+        return `${sender}: ${msg.NoiDung}`;
+      }).join('\n');
+
+      // Prompt cho Gemma 3: Yêu cầu tóm tắt nghiệp vụ
+      const prompt = `
+        Bạn là thư ký cuộc họp. Dưới đây là đoạn chat giữa khách hàng và quán:
+        
+        --- BẮT ĐẦU ĐOẠN CHAT ---
+        ${chatHistoryText}
+        --- KẾT THÚC ĐOẠN CHAT ---
+
+        NHIỆM VỤ:
+        1. Tóm tắt ngắn gọn nội dung chính của cuộc trò chuyện (Khách hỏi gì? Đã giải quyết thế nào?).
+        2. Đánh giá kết quả ngắn gọn (Ví dụ: "Khách đã đặt hàng", "Khách chỉ hỏi thăm", "Khách phàn nàn").
+        3. Chỉ trả về nội dung tóm tắt, không chào hỏi.
+      `;
+
+      // Gọi Ollama
+      const response = await fetch("http://localhost:11434/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "gemma3:4b",
+          prompt: prompt,
+          stream: false
+        }),
+      });
+
+      if (!response.ok) throw new Error("Ollama Error");
+      
+      const data = await response.json();
+      const summaryText = data.response.trim();
+
+      console.log(`✅ AI tóm tắt xong phiên ${chatSessionId}`);
+
+      // Lưu vào bảng tomtatphienchat
+      // Dùng findOrCreate để tránh trùng lặp nếu chạy 2 lần
+      const [summary, created] = await db.TomTatPhienChat.findOrCreate({
+        where: { MaPhienChat: chatSessionId },
+        defaults: {
+          NoiDungTomTat: summaryText,
+          KetQuaTuAI: "Đã xử lý" // Bạn có thể yêu cầu AI trích xuất trạng thái này riêng nếu muốn xịn hơn
+        }
+      });
+
+      if (!created) {
+        summary.NoiDungTomTat = summaryText;
+        await summary.save();
+      }
+
+    } catch (error) {
+      console.error("❌ Lỗi khi AI tóm tắt phiên chat:", error.message);
+    }
   }
 };
 

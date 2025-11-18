@@ -427,7 +427,8 @@ export function setupWebSocket(server) {
           for (const phienChat of activeSessions) {
             await ChatService.endChatSession(phienChat.MaPhienChat)
             console.log(`✅ Đã tự động đóng phiên chat ${phienChat.MaPhienChat}`)
-            AIService.updateCustomerPreferences(phienChat.MaPhienChat);
+            AIService.updateCustomerPreferences(phienChat.MaPhienChat);// cập nhật sở thích khách hàng
+            AIService.summarizeSession(phienChat.MaPhienChat); // tóm tắt phiên chat
           }
           
           if (currentChatSession && currentChatSession.MaKH === disconnectedClientId) {
