@@ -93,32 +93,43 @@ export default {
         console.log("WebSocket message received in AdminLayout:", data);
 
         if (data.type === "support_request") {
-          // Thêm canhBaoId vào client object khi có support request
-          const client = await this.addOrUpdateClient(data.clientId, true, data.canhBaoId);
-          if (client) {
-            // Show toast
-            this.$refs.toastRef.show(
-              `Khách hàng ${client.name || data.clientId} cần hỗ trợ.`,
-              'warning', // type
-              'Yêu cầu hỗ trợ mới' // title
-            );
-            // Add to notification center
-            this.notifications.unshift({
-              id: `req_${data.clientId}_${Date.now()}`,
-              type: 'support_request',
-              clientId: data.clientId,
-              canhBaoId: data.canhBaoId, // <-- LƯU LẠI CanhBaoID
-              clientName: client.name || 'Khách mới',
-              avatar: `https://i.pravatar.cc/40?u=${data.clientId}`,
-              time: new Date(),
-              is_read: false,
-            });
+          // --- THAY ĐỔI: BỎ addOrUpdateClient KHỎI ĐÂY ---
+          // const client = await this.addOrUpdateClient(data.clientId, true, data.canhBaoId); // <-- XÓA DÒNG NÀY
+
+          // CHỈ LẤY TÊN ĐỂ HIỂN THỊ THÔNG BÁO
+          let clientName = `Khách ${data.clientId}`; // Tên tạm thời
+          try {
+            // Gọi API thủ công để lấy tên
+            const response = await axios.get(`http://localhost:3000/api/auth/client/${data.clientId}`);
+            clientName = response.data.HoTen; // Lấy tên thật
+          } catch (error) {
+             console.error("❌ (AdminLayout) Error fetching client name for notification:", error);
           }
+          // --- KẾT THÚC THAY ĐỔI ---
+
+          // Show toast
+          this.$refs.toastRef.show(
+            `Khách hàng ${clientName} cần hỗ trợ.`, // Dùng tên vừa fetch
+            'warning', // type
+            'Yêu cầu hỗ trợ mới' // title
+          );
+          // Add to notification center
+          this.notifications.unshift({
+            id: `req_${data.clientId}_${Date.now()}`,
+            type: 'support_request',
+            clientId: data.clientId,
+            canhBaoId: data.canhBaoId, // <-- LƯU LẠI CanhBaoID
+            clientName: clientName, // Dùng tên vừa fetch
+            avatar: `https://i.pravatar.cc/40?u=${data.clientId}`,
+            time: new Date(),
+            is_read: false,
+          });
         }
 
         if (data.type === "client_message") {
+          // Luôn gọi addOrUpdateClient để cập nhật tên fallback nếu có
           const client = await this.addOrUpdateClient(data.clientId);
-           if (client) {
+            if (client) {
             this.notifications.unshift({
               id: `msg_${data.clientId}_${Date.now()}`,
               type: 'message',
@@ -131,35 +142,90 @@ export default {
             });
           }
         }
+
+        // Xử lý khi có admin KHÁC chấp nhận yêu cầu
+        if (data.type === "request_claimed") {
+          
+          console.log(`📢 (AdminLayout) Thu hồi thông báo có canhBaoId: ${data.canhBaoId}`);
+          
+          // 1. Thu hồi thông báo (Bạn đã có)
+          this.notifications = this.notifications.filter(
+            noti => noti.canhBaoId !== data.canhBaoId
+          );
+
+          // 2. [THÊM MỚI] Thu hồi client khỏi danh sách NẾU không phải mình chấp nhận
+          if (data.acceptedByEmployeeId !== this.employee.MaNV) {
+            console.log(`🔹 (AdminLayout) Xóa client ${data.clientId} khỏi danh sách vì NV khác đã nhận.`);
+            this.clients = this.clients.filter(c => c.id !== data.clientId);
+          }
+        }
       };
     },
 
     async addOrUpdateClient(clientId, hasRequest = false, canhBaoId = null) {
+      // 1. Kiểm tra xem client đã có trong danh sách chưa
       let client = this.clients.find((c) => c.id === clientId);
+
       if (!client) {
+        // --- CLIENT CHƯA TỒN TẠI ---
+        // Tiến hành fetch thông tin
+        let newClientData;
         try {
           const response = await axios.get(`http://localhost:3000/api/auth/client/${clientId}`);
-          client = { 
+          newClientData = { 
             id: clientId, 
-            name: response.data.HoTen,
+            name: response.data.HoTen, // Lấy tên thật
             hasRequest: hasRequest,
-            canhBaoId: canhBaoId // <-- LƯU LẠI CanhBaoID
+            canhBaoId: canhBaoId 
           };
-          this.clients.push(client);
         } catch (error) {
-          console.error("Error fetching client info:", error);
-          client = { id: clientId, name: `Khách ${clientId}`, hasRequest: hasRequest, canhBaoId: canhBaoId };
-          this.clients.push(client);
+          // API lỗi, tạo tên fallback
+          console.error("❌ (AdminLayout) Error fetching client info:", error);
+          const fallbackData = { id: clientId, name: `Khách ${clientId}`}; // Tên fallback
+          newClientData = {
+            ...fallbackData,
+            hasRequest: hasRequest,
+            canhBaoId: canhBaoId
+          };
         }
-      } else if (hasRequest) {
-        client.hasRequest = true;
-        client.canhBaoId = canhBaoId; // <-- CẬP NHẬT CanhBaoID
+        
+        // Thêm vào danh sách (Đây là nơi duy nhất 'push')
+        this.clients.push(newClientData);
+        return newClientData; // Trả về client mới
+
+      } else {
+        // --- CLIENT ĐÃ TỒN TẠI ---
+        
+        // Cập nhật trạng thái yêu cầu
+        if (hasRequest) {
+          client.hasRequest = true;
+          client.canhBaoId = canhBaoId;
+        }
+
+        // --- SỬA LỖI TÊN FALLBACK ---
+        // Nếu tên hiện tại là tên fallback, thử fetch lại tên thật
+        if (client.name.startsWith(`Khách `)) {
+          console.log(`🔹 (AdminLayout) Client ${clientId} đang dùng tên fallback. Thử fetch lại...`);
+          try {
+            const response = await axios.get(`http://localhost:3000/api/auth/client/${clientId}`);
+            if (response.data.HoTen) {
+              console.log(`✅ Cập nhật tên cho ${clientId} thành: ${response.data.HoTen}`);
+              client.name = response.data.HoTen; // Cập nhật tên thật
+            }
+          } catch (error) {
+            console.error(`❌ Vẫn lỗi khi fetch tên cho ${clientId}. Giữ tên fallback.`);
+          }
+        }
+        return client; // Trả về client đã cập nhật
       }
-      return client;
     },
 
-    handleAcceptRequest(notification) {
-      const client = this.clients.find(c => c.id === notification.clientId);
+    async handleAcceptRequest(notification) {
+      const client = await this.addOrUpdateClient(
+        notification.clientId,
+        false, // hasRequest (sẽ được cập nhật ngay sau đây)
+        notification.canhBaoId
+      );
       if (client) {
         this.ws.send(JSON.stringify({
           type: "admin_accept_request",

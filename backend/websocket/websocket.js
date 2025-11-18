@@ -208,35 +208,55 @@ export function setupWebSocket(server) {
 
       // ===== THAY ĐỔI 7: Sửa CLIENT MESSAGE (gửi cho TẤT CẢ admin) =====
       if (data.type === "client_message") {
-        console.log(`📤 Client message from ${data.clientId}: ${data.message}`)
+        console.log(`📤 Client message from ${data.clientId}: ${data.message}`);
+        
+        const clientData = clients.get(data.clientId);
 
-        // Gửi cho TẤT CẢ admin (để họ cùng thấy)
-        if (adminSockets.size > 0) { 
+        // 1. Kiểm tra xem client có đang trong phiên chat với Admin không
+        // (Nếu clientData.chatSessionId là null, nghĩa là họ đang chat với AI -> không làm gì cả)
+        if (clientData && clientData.chatSessionId) {
+          const chatSessionId = clientData.chatSessionId;
+          let targetEmployeeId = null;
+
           try {
-            const clientData = clients.get(data.clientId)
-            if (clientData && clientData.chatSessionId) {
-              await ChatService.saveMessage(clientData.chatSessionId, data.message, "KhachHang")
+            // 2. Lưu tin nhắn vào DB
+            await ChatService.saveMessage(chatSessionId, data.message, "KhachHang");
+
+            // 3. Tìm phiên chat để lấy MaNV (Admin) đang phụ trách
+            const phienChat = await db.PhienChat.findByPk(chatSessionId);
+            if (phienChat && phienChat.MaNV) {
+              targetEmployeeId = phienChat.MaNV;
+            } else {
+              console.log(`❌ Không tìm thấy PhienChat hoặc MaNV cho session ${chatSessionId}`);
+              return; // Không tìm thấy admin phụ trách
             }
 
-            const messagePayload = JSON.stringify({
-              type: "client_message",
-              clientId: data.clientId,
-              message: data.message,
-            });
+            // 4. Tìm socket của admin đó
+            const adminData = adminSockets.get(targetEmployeeId);
 
-            for (const [employeeId, adminData] of adminSockets.entries()) {
-               if (adminData.ws.readyState === WebSocket.OPEN) {
-                  adminData.ws.send(messagePayload);
-               }
+            // 5. Gửi tin nhắn CHỈ cho admin đó
+            if (adminData && adminData.ws.readyState === WebSocket.OPEN) {
+              const messagePayload = JSON.stringify({
+                type: "client_message",
+                clientId: data.clientId,
+                message: data.message,
+              });
+              
+              adminData.ws.send(messagePayload);
+              console.log(`✅ Client message delivered to Admin ${targetEmployeeId}`);
+            } else {
+              console.log(`❌ Client ${data.clientId} sent message, but Admin ${targetEmployeeId} is not connected.`);
+              // (Tin nhắn đã được lưu vào DB, admin sẽ thấy khi tải lại)
             }
-            console.log(`✅ Client message delivered to ${adminSockets.size} admin(s)`)
           } catch (error) {
-            console.error("❌ Error saving client message:", error)
+            console.error("❌ Error processing client message:", error);
           }
         } else {
-          console.log("❌ No admin connected")
+          // Client không có chatSessionId (tức là đang chat với AI)
+          // Không cần làm gì ở server (vì logic AI nằm ở client)
+          console.log("🔹 Client message (cho AI) received, no admin action.");
         }
-        return
+        return;
       }
       // ================================================================
 
