@@ -1,4 +1,5 @@
 import db from "../models/index.js"
+const { Op } = db.Sequelize;
 
 export class ChatService {
   static async CreateChatSession(clientId, employeeId, clientName = null) {
@@ -224,6 +225,79 @@ export class ChatService {
     } catch (error) {
       console.error("❌ Lỗi tạm dừng chat:", error)
       throw error
+    }
+  }
+
+  static async getPreviousSessionMessages(currentChatSessionId, clientId) {
+    try {
+      console.log(`🔹 Tìm phiên chat liền kề trước đó của khách: ${clientId}`);
+
+      // Bước 1: Tìm phiên chat gần nhất của khách này, nhưng KHÔNG PHẢI phiên hiện tại
+      // Logic: Lấy tất cả phiên của MaKH=3, trừ phiên 173, sắp xếp giảm dần theo thời gian -> Lấy cái đầu tiên.
+      const previousSession = await db.PhienChat.findOne({
+        where: {
+          MaKH: clientId, // BẮT BUỘC: Phải đúng khách này
+          MaPhienChat: { 
+            [Op.ne]: currentChatSessionId // ne = Not Equal (Khác phiên hiện tại)
+          },
+          // Đảm bảo lấy phiên cũ hơn (đề phòng trường hợp tạo nhầm phiên tương lai)
+          ThoiGianBatDau: {
+             [Op.lt]: new Date() // (Tuỳ chọn)
+          }
+        },
+        // Sắp xếp theo thời gian bắt đầu giảm dần (Mới nhất lên đầu)
+        order: [
+            ['ThoiGianBatDau', 'DESC'], 
+            ['MaPhienChat', 'DESC'] // Nếu trùng giờ thì lấy theo ID
+        ],
+      });
+
+      if (!previousSession) {
+        console.log("⚠️ Khách hàng này chưa có phiên chat nào trước đó.");
+        return [];
+      }
+
+      console.log(`✅ Đã tìm thấy phiên liền kề: ${previousSession.MaPhienChat} (Ngày: ${previousSession.ThoiGianBatDau})`);
+
+      // Bước 2: Lấy danh sách tin nhắn của phiên vừa tìm được
+      const messages = await db.TinNhan.findAll({
+        where: { MaPhienChat: previousSession.MaPhienChat },
+        order: [["ThoiGianGui", "ASC"]], // Tin nhắn xếp theo thứ tự thời gian xuôi
+      });
+
+      return messages; // Trả về danh sách tin nhắn
+    } catch (error) {
+      console.error("❌ Lỗi lấy tin nhắn phiên trước:", error);
+      throw error;
+    }
+  }
+
+  // ================================================================
+  //  2. HÀM LẤY TOÀN BỘ LỊCH SỬ (Khi nhân viên muốn xem tất cả)
+  // ================================================================
+  static async getFullClientHistory(clientId) {
+    try {
+      console.log(`🔹 Lấy toàn bộ tin nhắn của khách: ${clientId}`);
+
+      // Lấy tin nhắn, JOIN với bảng PhienChat để lọc theo MaKH
+      // Cách này tối ưu: Chỉ lấy tin nhắn thuộc về các phiên của khách hàng đó
+      const allMessages = await db.TinNhan.findAll({
+        include: [{
+          model: db.PhienChat,
+          where: { MaKH: clientId }, // Chỉ lấy tin nhắn của khách này
+          attributes: ['MaPhienChat', 'ThoiGianBatDau'], // Lấy thêm thời gian phiên để hiển thị phân cách
+        }],
+        order: [
+          [db.PhienChat, 'ThoiGianBatDau', 'ASC'], // Sắp xếp các phiên theo thứ tự thời gian
+          ['ThoiGianGui', 'ASC']                    // Trong mỗi phiên, tin nhắn xếp xuôi
+        ]
+      });
+
+      console.log(`✅ Đã lấy ${allMessages.length} tin nhắn toàn bộ lịch sử.`);
+      return allMessages;
+    } catch (error) {
+      console.error("❌ Lỗi lấy toàn bộ lịch sử:", error);
+      throw error;
     }
   }
 }
