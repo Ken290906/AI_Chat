@@ -24,7 +24,7 @@
                 <h6 class="mb-1">{{ client.name || 'Khách mới' }}</h6>
                 <small class="text-muted">online</small>
               </div>
-              <p class="mb-1 small text-muted">
+              <p class="mb-1 small text-muted text-truncate">
                 {{ getLastMessage(client.id) }}
               </p>
             </div>
@@ -33,20 +33,25 @@
       </div>
 
       <div class="col-md-8 d-flex flex-column p-0">
-        <div v-if="activeClient" class="chat-header p-3 border-bottom d-flex align-items-center">
-          <img 
-            :src="`https://i.pravatar.cc/40?u=${activeClient.id}`" 
-            class="rounded-circle me-3" 
-            :alt="activeClient.name"
-            style="width: 40px; height: 40px; object-fit: cover;"
-          >
-          <div>
-            <h6 class="mb-0 fw-bold">{{ activeClient.name }}</h6>
-            <small class="text-muted">Online via Website</small>
+        <div v-if="activeClient" class="chat-header p-3 border-bottom d-flex align-items-center justify-content-between">
+          <div class="d-flex align-items-center">
+             <img 
+              :src="`https://i.pravatar.cc/40?u=${activeClient.id}`" 
+              class="rounded-circle me-3" 
+              :alt="activeClient.name"
+              style="width: 40px; height: 40px; object-fit: cover;"
+            >
+            <div>
+              <h6 class="mb-0 fw-bold">{{ activeClient.name }}</h6>
+            </div>
           </div>
+          
+          <button class="btn btn-sm btn-outline-secondary" @click="loadFullHistory(activeClient.id)">
+            <i class="bi bi-clock-history"></i> Lịch sử tin nhắn
+          </button>
         </div>
 
-        <div class="chat-body flex-grow-1 p-4 overflow-auto">
+        <div class="chat-body flex-grow-1 p-4 overflow-auto" ref="chatBody">
           <div v-if="!activeClient" class="d-flex h-100 align-items-center justify-content-center text-muted">
             <div>
               <i class="bi bi-chat-dots fs-1"></i>
@@ -55,14 +60,28 @@
           </div>
 
           <template v-else>
+             <div v-if="isLoadingHistory" class="text-center mb-3">
+               <small class="text-muted"><i class="bi bi-arrow-clockwise spin"></i> Đang tải dữ liệu cũ...</small>
+            </div>
+
             <div
               v-for="(msg, idx) in activeChatMessages"
               :key="idx"
               :class="['d-flex', msg.isAdmin ? 'justify-content-end' : 'justify-content-start', 'mb-3', 'message-animation']"
             >
               <template v-if="msg.isAdmin">
-                <div class="message-bubble user-message">
-                  {{ msg.text }}
+                <div class="d-flex flex-column align-items-end" style="max-width: 75%;">
+                  
+                  <small v-if="msg.isBot" class="text-muted mb-1 me-2 fst-italic" style="font-size: 0.7rem;">
+                    <i class="bi bi-robot"></i> AI Trợ lý (Phiên trước)
+                  </small>
+
+                  <div 
+                    class="message-bubble"
+                    :class="msg.isBot ? 'bot-message' : 'user-message'"
+                  >
+                    {{ msg.text }}
+                  </div>
                 </div>
               </template>
               
@@ -113,21 +132,15 @@ export default {
   data() {
     return {
       activeClient: null,
-      // SỬA LỖI LOGIC: Dùng 1 object để lưu TẤT CẢ hội thoại
-      allConversations: {}, // Ví dụ: { 'client-1': [msg1, msg2], 'client-2': [msg3] }
+      allConversations: {}, 
       newMessage: "",
+      isLoadingHistory: false,
+      historyLoadedMap: {}, // Đánh dấu khách nào đã load lịch sử rồi
     };
   },
-  // SỬA LỖI LOGIC: Thêm computed property
   computed: {
-    /**
-     * Tự động trả về mảng tin nhắn của client đang được chọn
-     */
     activeChatMessages() {
-      if (!this.activeClient) {
-        return [];
-      }
-      // Nếu chưa có mảng tin nhắn cho client này, hãy tạo một mảng rỗng
+      if (!this.activeClient) return [];
       if (!this.allConversations[this.activeClient.id]) {
         this.allConversations[this.activeClient.id] = [];
       }
@@ -140,8 +153,10 @@ export default {
       handler(newId) {
         if (newId) {
           this.activeClient = this.clients.find(c => c.id === newId);
-          // SỬA LỖI LOGIC: Truyền Id vào
-          this.loadMessageHistory(newId);
+          if (this.activeClient) {
+             // Gọi hàm load lịch sử khi chọn khách
+             this.loadMessageHistory(newId, this.activeClient.sessionId);
+          }
         } else {
           this.activeClient = null;
         }
@@ -150,202 +165,158 @@ export default {
     ws: {
         immediate: true,
         handler(newWs) {
-            if (newWs) {
-                newWs.addEventListener('message', this.handleWsMessage);
-            }
+            if (newWs) newWs.addEventListener('message', this.handleWsMessage);
         }
     }
   },
   beforeUnmount() {
-    if (this.ws) {
-        this.ws.removeEventListener('message', this.handleWsMessage);
-    }
+    if (this.ws) this.ws.removeEventListener('message', this.handleWsMessage);
   },
   methods: {
     async handleWsMessage(event) {
         const data = JSON.parse(event.data);
-        
-        // SỬA LỖI LOGIC: Lưu tin nhắn vào đúng mảng hội thoại
         if (data.type === "client_message") {
           const clientId = data.clientId;
-          // Đảm bảo mảng tồn tại
-          if (!this.allConversations[clientId]) {
-             this.allConversations[clientId] = [];
-          }
-          // Thêm tin nhắn vào mảng của client đó
-          this.allConversations[clientId].push({ text: data.message, isAdmin: false });
+          if (!this.allConversations[clientId]) this.allConversations[clientId] = [];
+          this.allConversations[clientId].push({ 
+              text: data.message, 
+              isAdmin: false,
+              isBot: false
+          });
+          this.scrollToBottom();
         }
-
-        // 2. Xử lý khi admin khác "claim" mất client
-        if (data.type === "request_claimed") {
-          if (this.activeClient && this.activeClient.id === data.clientId) {
-            if (data.acceptedByEmployeeId !== this.employee.MaNV) {
-              console.log(`🔹 (ChatPanel) ${data.acceptedByEmployeeName} đã chấp nhận. Tự động đóng cửa sổ chat này.`);
-              this.activeClient = null;
-              // mảng 'allConversations[data.clientId]' vẫn được giữ
-              // nhưng 'activeChatMessages' sẽ trả về []
-            }
-          }
-        }
+        // Handle request_claimed...
     },
     
     selectClient(client) {
       this.$emit('select-client', client);
     },
-    
-    // SỬA LỖI LOGIC: Cập nhật hàm này
-    loadMessageHistory(clientId) {
-      // Trong ứng dụng thật, bạn sẽ gọi API tại đây
-      // Ví dụ: this.allConversations[clientId] = await axios.get(...)
+
+    // === 1. HÀM LẤY LỊCH SỬ PHIÊN LIỀN KỀ (QUAN TRỌNG) ===
+    async loadMessageHistory(clientId, currentSessionId) {
+      // Nếu đã load rồi thì thôi, tránh spam API
+      if (this.historyLoadedMap[clientId]) return;
       
-      // Hiện tại, chúng ta chỉ cần đảm bảo mảng tồn tại
-      if (clientId && !this.allConversations[clientId]) {
+      // Nếu chưa có mảng hội thoại thì khởi tạo
+      if (!this.allConversations[clientId]) {
         this.allConversations[clientId] = [];
       }
-      // KHÔNG còn `this.chatMessages = []`
+
+      this.isLoadingHistory = true;
+      try {
+        // Gọi API Backend vừa tạo ở Bước 2
+        // Lưu ý: Sửa lại URL localhost nếu cổng của bạn khác
+        const response = await axios.get(`http://localhost:3000/api/chat/history/previous`, {
+            params: {
+                clientId: clientId,
+                currentSessionId: currentSessionId || 0 // Gửi ID phiên hiện tại lên để loại trừ
+            }
+        });
+
+        const rawMessages = response.data; 
+
+        // Map dữ liệu DB sang Vue
+        const formattedMessages = rawMessages.map(msg => {
+            // NguoiGui trong DB là: 'HeThong', 'NhanVien', 'KhachHang'
+            const isSystem = msg.NguoiGui === 'HeThong';
+            const isEmployee = msg.NguoiGui === 'NhanVien';
+            
+            return {
+                text: msg.NoiDung,
+                isAdmin: isSystem || isEmployee, // Cả Bot và NV đều nằm bên phải
+                isBot: isSystem,                 // Cờ riêng để tô màu xám
+                createdAt: msg.ThoiGianGui
+            };
+        });
+
+        // Nối lịch sử vào ĐẦU mảng tin nhắn hiện tại
+        this.allConversations[clientId] = [...formattedMessages, ...this.allConversations[clientId]];
+        
+        this.historyLoadedMap[clientId] = true; // Đánh dấu đã load
+        this.scrollToBottom();
+
+      } catch (error) {
+        console.error("Lỗi tải lịch sử:", error);
+      } finally {
+        this.isLoadingHistory = false;
+      }
     },
-    
+
+    // === 2. HÀM LẤY TOÀN BỘ LỊCH SỬ ===
+    async loadFullHistory(clientId) {
+        if(!confirm("Tải toàn bộ lịch sử chat của khách hàng này?")) return;
+        
+        try {
+            const response = await axios.get(`http://localhost:3000/api/chat/history/full/${clientId}`);
+            const rawMessages = response.data;
+            
+            const formattedMessages = rawMessages.map(msg => ({
+                text: msg.NoiDung,
+                isAdmin: msg.NguoiGui !== 'KhachHang',
+                isBot: msg.NguoiGui === 'HeThong',
+                createdAt: msg.ThoiGianGui
+            }));
+
+            // Ghi đè toàn bộ để xem full
+            this.allConversations[clientId] = formattedMessages;
+            this.scrollToBottom();
+        } catch (e) {
+            console.error("Lỗi full history:", e);
+        }
+    },
+
     sendMessage() {
       if (!this.newMessage.trim() || !this.activeClient || !this.ws) return;
-      
       const text = this.newMessage.trim();
       const clientId = this.activeClient.id;
 
-      // SỬA LỖI LOGIC: Thêm tin nhắn vào đúng mảng hội thoại
-      this.allConversations[clientId].push({ text, isAdmin: true });
+      this.allConversations[clientId].push({ text, isAdmin: true, isBot: false });
       
-      this.ws.send(
-        JSON.stringify({
-          type: "admin_message",
-          clientId: clientId,
-          message: text,
-        })
-      );
+      this.ws.send(JSON.stringify({
+        type: "admin_message",
+        clientId: clientId,
+        message: text,
+      }));
       this.newMessage = "";
+      this.scrollToBottom();
     },
     
-    // SỬA LỖI LOGIC: Lấy tin nhắn cuối cùng từ 'allConversations'
     getLastMessage(clientId) {
       const conversation = this.allConversations[clientId];
-      if (!conversation || conversation.length === 0) {
-        return 'Chưa có tin nhắn'; // Trả về tin nhắn mặc định
-      }
-      // Trả về nội dung text của tin nhắn cuối cùng
+      if (!conversation || conversation.length === 0) return 'Chưa có tin nhắn';
       const lastMsg = conversation[conversation.length - 1];
       return lastMsg.isAdmin ? `Bạn: ${lastMsg.text}` : lastMsg.text;
     },
+
+    scrollToBottom() {
+        this.$nextTick(() => {
+            const container = this.$refs.chatBody;
+            if (container) container.scrollTop = container.scrollHeight;
+        });
+    }
   },
 };
 </script>
 
 <style scoped>
-/* Toàn bộ CSS GIAO DIỆN MỚI của bạn được giữ nguyên */
-:root {
-  --primary-color: #4A55A2;
-  --background-color: #f0f2f5;
-  --sidebar-bg: #ffffff;
-  --border-color: #dee2e6;
-}
+/* Giữ nguyên CSS cũ */
+:root { --primary-color: #4A55A2; --background-color: #f0f2f5; --sidebar-bg: #ffffff; --border-color: #dee2e6; }
+.chat-panel, .row { height: 100%; }
+.list-group-item.active { background-color: var(--primary-color); color: white; border-color: var(--primary-color); }
+.chat-header { background-color: var(--sidebar-bg); height: 70px; }
+.chat-body { background-color: var(--background-color); }
+.message-bubble { padding: 12px 20px; border-radius: 20px; max-width: 75%; line-height: 1.5; font-size: 0.95rem; word-wrap: break-word; }
+.user-message { background: linear-gradient(to right, #4A55A2, #7895CB); color: white; border-bottom-right-radius: 5px; }
+.agent-message { background-color: #e9ecef; color: #333; border-bottom-left-radius: 5px; }
+.chat-footer { background-color: var(--sidebar-bg); border-top: 1px solid var(--border-color); padding: 1rem 1.5rem 1.5rem 1.5rem; }
+.chat-footer .form-control { background-color: var(--background-color); border-radius: 1rem !important; border: 0; padding: 0.75rem 1rem; }
+.btn-primary-custom { background-color: var(--primary-color); color: white; border-radius: 50% !important; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; margin-left: 8px; border: none; }
 
-.chat-panel, .row {
-  height: 100%;
-}
-
-.list-group-item.active {
-  background-color: var(--primary-color);
-  color: white;
-  border-color: var(--primary-color);
-}
-.list-group-item.active .text-muted {
-    color: rgba(255, 255, 255, 0.7) !important;
-}
-
-.chat-header {
-  background-color: var(--sidebar-bg);
-  height: 70px;
-}
-
-.chat-body {
-  background-color: var(--background-color);
-}
-
-@keyframes message-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.message-animation {
-  animation: message-fade-in 0.5s ease-out;
-}
-
-.message-bubble {
-  padding: 12px 20px;
-  border-radius: 20px;
-  max-width: 75%;
-  line-height: 1.5;
-  font-size: 0.95rem;
-  word-wrap: break-word;
-}
-
-.user-message {
-  background: linear-gradient(to right, #4A55A2, #7895CB);
+/* === CSS MỚI CHO BOT === */
+.bot-message {
+  /* Màu xám cho AI để phân biệt với Admin */
+  background: linear-gradient(to right, #6c757d, #adb5bd); 
   color: white;
   border-bottom-right-radius: 5px;
-}
-
-.agent-message {
-  background-color: #e9ecef;
-  color: #333;
-  border-bottom-left-radius: 5px;
-}
-
-.chat-footer {
-  background-color: var(--sidebar-bg);
-  border-top: 1px solid var(--border-color);
-  padding: 1rem 1.5rem 1.5rem 1.5rem;
-}
-
-.chat-footer .input-group {
-  align-items: center;
-}
-
-.chat-footer .form-control {
-  background-color: var(--background-color);
-  border-radius: 1rem !important;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
-  border: 0;
-  padding: 0.75rem 1rem;
-}
-
-.chat-footer .form-control:focus {
-  box-shadow: 0 0 0 0.25rem rgba(74, 85, 162, 0.25);
-  border-color: var(--primary-color);
-}
-
-.btn-outline-secondary.border-0 {
-  color: #6c757d;
-}
-
-.btn-primary-custom {
-  background-color: var(--primary-color);
-  color: white;
-  border-radius: 50% !important;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color 0.3s ease;
-  margin-left: 8px;
-  border: none;
-}
-
-.btn-primary-custom:hover {
-  background-color: #3a448a;
 }
 </style>

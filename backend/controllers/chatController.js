@@ -133,3 +133,46 @@ export const chatWithAI = async (req, res) => {
     });
   }
 };
+/**
+ * API: Lấy tin nhắn của phiên liền kề trước đó (để nhân viên xem ngữ cảnh AI)
+ * GET /api/chat/history/previous?clientId=...&currentSessionId=...
+ */
+export const getPreviousSessionHistory = async (req, res) => {
+  try {
+    const { clientId, currentSessionId } = req.query;
+
+    if (!clientId || !currentSessionId) {
+      return res.status(400).json({ error: "Missing clientId or currentSessionId" });
+    }
+
+    // Gọi Service đã viết
+    const messages = await ChatService.getPreviousSessionMessages(currentSessionId, clientId);
+    
+    res.json(messages);
+  } catch (error) {
+    console.error("Error getting previous history:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+/**
+ * API: Lấy toàn bộ lịch sử chat của khách hàng
+ * GET /api/chat/history/full/:clientId
+ */
+export const getFullClientHistory = async (req, res) => {
+  try {
+    const { clientId } = req.params;
+
+    if (!clientId) {
+      return res.status(400).json({ error: "Missing clientId" });
+    }
+
+    // Gọi Service đã viết
+    const messages = await ChatService.getFullClientHistory(clientId);
+    
+    res.json(messages);
+  } catch (error) {
+    console.error("Error getting full history:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};

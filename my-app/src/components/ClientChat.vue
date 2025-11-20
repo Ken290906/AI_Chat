@@ -3,17 +3,17 @@
     <!-- Chat Header -->
     <div class="chat-header p-3 border-bottom d-flex align-items-center">
       <img 
-        :src="employeeInfo ? `https://i.pravatar.cc/40?u=employee${employeeInfo.MaNV}` : 'https://i.pravatar.cc/40?u=ai'" 
+        :src="getAvatarSource()" 
         class="rounded-circle me-3" 
-        :alt="employeeInfo ? employeeInfo.HoTen : 'Trợ lý AI (Gemma3)'"
+        :alt="getAgentName()"
         style="width: 40px; height: 40px; object-fit: cover;"
       >
       <div>
         <h6 class="mb-0 fw-bold">
-          {{ employeeInfo ? employeeInfo.HoTen : 'Trợ lý AI (Gemma3)' }}
+          {{ getAgentName() }}
         </h6>
         <small class="text-muted">
-          {{ employeeInfo ? 'Nhân viên hỗ trợ' : 'Trợ lý ảo' }}
+          {{ getAgentRole() }}
         </small>
       </div>
     </div>
@@ -23,10 +23,8 @@
       <!-- Thông báo kết nối thành công với nhân viên -->
       <div v-if="employeeInfo" class="text-center mb-3">
         <div class="alert alert-success alert-dismissible fade show d-inline-flex align-items-center" role="alert">
-          <i class="bi bi-check-circle-fill me-2"></i>
           <div>
-            <strong>Đã kết nối với {{ employeeInfo.HoTen }}</strong>
-            <div class="small">Nhân viên hỗ trợ</div>
+            <strong>Đã kết nối với nhân viên</strong>
           </div>
         </div>
       </div>
@@ -49,24 +47,25 @@
 
         <!-- Tin nhắn từ Agent (nhân viên/AI) -->
         <template v-else>
-          <img
-            :src="getAvatarSource()"
-            :alt="getAgentName()"
-            width="32"
-            height="32"
-            class="rounded-circle me-2"
-          />
-          <div class="message-bubble agent-message">
-            {{ message.text }}
-            <!-- Hiển thị tên người gửi cho tin nhắn từ nhân viên -->
-            <div v-if="employeeInfo && index > 0" class="text-white-50 small mb-1">
-              {{ employeeInfo.HoTen }}
-            </div>
-            <div class="text-end text-white-50 small mt-1">
-              {{ formatMessageTime(message.timestamp) }}
-            </div>
+        <img
+          :src="getAvatarSource()"
+          :alt="getAgentName()"
+          width="32"
+          height="32"
+          class="rounded-circle me-2"
+        />
+        <div class="message-bubble agent-message">
+          {{ message.text }}
+          
+          <div v-if="employeeInfo && index > 0" class="text-white-50 small mb-1">
+            Nhân viên hỗ trợ
           </div>
-        </template>
+          
+          <div class="text-end text-white-50 small mt-1">
+            {{ formatMessageTime(message.timestamp) }}
+          </div>
+        </div>
+      </template>
       </div>
 
       <!-- Loading Effect -->
@@ -164,7 +163,7 @@ export default {
 
     getAgentName() {
       if (this.employeeInfo) {
-        return this.employeeInfo.HoTen;
+        return 'Nhân viên hỗ trợ'; 
       }
       return 'Trợ lý AI (Gemma3)';
     },
@@ -181,7 +180,7 @@ export default {
       if (this.isAwaitingAdmin) {
         return 'Đang chờ nhân viên hỗ trợ...';
       } else if (this.isAdminChat && this.employeeInfo) {
-        return `Nhắn tin với ${this.employeeInfo.HoTen}...`;
+        return `Nhắn tin với Nhân viên hỗ trợ...`;
       } else {
         return 'Nhập tin nhắn của bạn...';
       }
@@ -249,7 +248,7 @@ export default {
             console.log("✅ Connected with employee:", this.employeeInfo);
             
             this.messages.push({
-              text: `✅ Đã kết nối với ${this.employeeInfo.HoTen}. Bạn có thể bắt đầu trò chuyện!`,
+              text: `✅ Đã kết nối nhân viên hỗ trợ. Bạn có thể bắt đầu trò chuyện!`,
               isUser: false,
               timestamp: new Date()
             });
