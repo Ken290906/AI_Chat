@@ -22,11 +22,6 @@
     <div class="chat-body flex-grow-1 p-4 overflow-auto" ref="chatBody">
       <!-- Thông báo kết nối thành công với nhân viên -->
       <div v-if="employeeInfo" class="text-center mb-3">
-        <div class="alert alert-success alert-dismissible fade show d-inline-flex align-items-center" role="alert">
-          <div>
-            <strong>Đã kết nối với nhân viên</strong>
-          </div>
-        </div>
       </div>
 
       <!-- TIN NHẮN -->
@@ -333,11 +328,31 @@ export default {
       this.promptCount++;
 
       if (this.promptCount >= 3) {
+        // === BƯỚC QUAN TRỌNG: Gửi tin nhắn text xuống server trước ===
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+           this.ws.send(JSON.stringify({ 
+             type: "client_message", 
+             clientId: this.clientId, 
+             message: text 
+           }));
+        }
+        // =============================================================
+
         this.requestSupport("⚠️ AI đã gặp lỗi sau 3 lần thử. Hệ thống đang kết nối bạn với nhân viên hỗ trợ...");
-        return;
+        return; 
       }
 
       if (this.containsSupportKeyword(text)) {
+        // === Gửi tin nhắn text xuống server trước ===
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+           this.ws.send(JSON.stringify({ 
+             type: "client_message", 
+             clientId: this.clientId, 
+             message: text 
+           }));
+        }
+        // ============================================
+        
         this.requestSupport("📞 Hệ thống đang kết nối bạn với nhân viên hỗ trợ...");
         return;
       }

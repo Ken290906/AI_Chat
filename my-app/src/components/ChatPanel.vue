@@ -70,7 +70,7 @@
               :class="['d-flex', msg.isAdmin ? 'justify-content-end' : 'justify-content-start', 'mb-3', 'message-animation']"
             >
               <template v-if="msg.isAdmin">
-                <div class="d-flex flex-column align-items-end" style="max-width: 75%;">
+                <div class="d-flex flex-column align-items-end" style="max-width: 75%;"> 
                   
                   <small v-if="msg.isBot" class="text-muted mb-1 me-2 fst-italic" style="font-size: 0.7rem;">
                     <i class="bi bi-robot"></i> AI Trợ lý (Phiên trước)
@@ -79,12 +79,12 @@
                   <div 
                     class="message-bubble"
                     :class="msg.isBot ? 'bot-message' : 'user-message'"
+                    style="max-width: 100%;"
                   >
                     {{ msg.text }}
                   </div>
                 </div>
               </template>
-              
               <template v-else>
                 <img :src="`https://i.pravatar.cc/32?u=${activeClient.id}`" class="rounded-circle me-2" alt="" width="32" height="32">
                 <div class="message-bubble agent-message">
@@ -305,7 +305,7 @@ export default {
 .list-group-item.active { background-color: var(--primary-color); color: white; border-color: var(--primary-color); }
 .chat-header { background-color: var(--sidebar-bg); height: 70px; }
 .chat-body { background-color: var(--background-color); }
-.message-bubble { padding: 12px 20px; border-radius: 20px; max-width: 75%; line-height: 1.5; font-size: 0.95rem; word-wrap: break-word; }
+.message-bubble { padding: 12px 20px; border-radius: 20px; max-width: 75%; width: fit-content; line-height: 1.5; font-size: 0.95rem; word-wrap: break-word; }
 .user-message { background: linear-gradient(to right, #4A55A2, #7895CB); color: white; border-bottom-right-radius: 5px; }
 .agent-message { background-color: #e9ecef; color: #333; border-bottom-left-radius: 5px; }
 .chat-footer { background-color: var(--sidebar-bg); border-top: 1px solid var(--border-color); padding: 1rem 1.5rem 1.5rem 1.5rem; }

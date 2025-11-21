@@ -120,19 +120,53 @@ export function setupWebSocket(server) {
         const clientId = data.clientId
 
         try {
-          // Nếu không có phiên chat, hãy tạo một phiên mới
+          // === BƯỚC 1: Ưu tiên tìm phiên chat đang hoạt động (Fix lỗi tạo phiên 210/211) ===
+          // Nếu client không gửi session ID, hoặc gửi sai, ta tìm trong DB trước
           if (!phienChatId) {
-            console.log(`🔹 support_request không có chatSessionId. Tạo phiên chat mới...`);
-            const newSession = await ChatService.CreateChatSession(clientId, null, null); // Chưa có nhân viên nào chấp nhận
+             const activeSession = await db.PhienChat.findOne({
+                where: { MaKH: clientId, TrangThai: 'DangHoatDong' },
+                order: [['ThoiGianBatDau', 'DESC']] 
+             });
+             
+             if (activeSession) {
+                phienChatId = activeSession.MaPhienChat;
+                console.log(`🔹 Tìm thấy phiên chat đang hoạt động: ${phienChatId} (Sử dụng lại thay vì tạo mới)`);
+             }
+          }
+
+          // Chỉ tạo mới nếu thực sự không tìm thấy
+          if (!phienChatId) {
+            console.log(`🔹 Không tìm thấy phiên cũ. Tạo phiên chat mới...`);
+            const newSession = await ChatService.CreateChatSession(clientId, null, null);
             phienChatId = newSession.MaPhienChat;
             console.log(`✅ Đã tạo phiên chat mới: ${phienChatId}`);
           }
+
+          // === BƯỚC 2: Chặn cảnh báo kép (Fix lỗi 115 và 116 cùng lúc) ===
+          // Kiểm tra xem phiên này đã có cảnh báo nào "ChuaXuLy" chưa?
+          // Logic: Nếu vừa bị "ai error" (115), nó sẽ tìm thấy và DỪNG LẠI, không tạo "need support" (116) nữa.
+          const existingWarning = await db.CanhBao.findOne({
+             where: { 
+                 MaPhienChat: phienChatId
+             }
+          });
+
+          if (existingWarning) {
+             console.log(`🛑 Đã tồn tại cảnh báo (ID: ${existingWarning.MaCB}, Loại: ${existingWarning.LoaiCanhBao}). Bỏ qua yêu cầu 'need support' để tránh spam.`);
+             
+             // Tùy chọn: Nếu bạn vẫn muốn rung chuông admin nhưng không tạo dữ liệu rác
+             // Thì có thể gọi notifyAdmin ở đây nhưng dùng existingWarning.
+             // Tuy nhiên, tốt nhất là return luôn để admin không bị nhận 2 thông báo.
+             return; 
+          }
+
+          // === BƯỚC 3: Nếu chưa có cảnh báo nào, thì tạo mới (Logic cũ) ===
           const canhBao = await ChatService.createWarning(
             phienChatId, clientId, "need support",
             `Khách ${clientId} chủ động yêu cầu hỗ trợ`
           );
 
-          // B2: Gửi yêu cầu cho TẤT CẢ Admin
+          // Gửi thông báo socket
           if (adminSockets.size > 0) {
             let notifiedCount = 0;
             const messagePayload = JSON.stringify({
@@ -145,28 +179,17 @@ export function setupWebSocket(server) {
             
             for (const [employeeId, adminData] of adminSockets.entries()) {
                 if (adminData.ws.readyState === WebSocket.OPEN) {
-                    try { 
-                        adminData.ws.send(messagePayload);
-                        notifiedCount++;
-                    } catch (error) { 
-                        console.error(`❌ Lỗi khi gửi 'support_request' cho admin ${employeeId}:`, error);
-                    }
-                } else {
-                    // ===== THÊM KHỐI ELSE NÀY =====
-                    // Dọn dẹp "zombie socket"
-                    // Socket này có trong Map nhưng không 'OPEN' (có thể là 'CLOSED' hoặc 'CLOSING')
-                    console.log(`🧹 Dọn dẹp zombie socket (trong lúc gửi) cho admin ${employeeId}`);
-                    adminSockets.delete(employeeId);
-                    // ===================================
+                    adminData.ws.send(messagePayload);
+                    notifiedCount++;
                 }
             }
             console.log(`📢 Sent support request to ${notifiedCount}/${adminSockets.size} admins (CB: ${canhBao.MaCB})`);
           } else {
-            console.log("❌ No admin connected (nhưng đã lưu Cảnh BÁO)")
+            console.log("❌ No admin connected")
           }
           
         } catch (error) {
-          console.error("❌ Lỗi khi tạo bản ghi Cảnh Báo (client request):", error);
+          console.error("❌ Lỗi khi xử lý support_request:", error);
         }
         return
       }
@@ -212,50 +235,64 @@ export function setupWebSocket(server) {
         console.log(`📤 Client message from ${data.clientId}: ${data.message}`);
         
         const clientData = clients.get(data.clientId);
+        const clientId = data.clientId;
 
-        // 1. Kiểm tra xem client có đang trong phiên chat với Admin không
-        // (Nếu clientData.chatSessionId là null, nghĩa là họ đang chat với AI -> không làm gì cả)
-        if (clientData && clientData.chatSessionId) {
-          const chatSessionId = clientData.chatSessionId;
-          let targetEmployeeId = null;
+        try {
+          // 1. Lấy Session ID từ RAM trước
+          let chatSessionId = clientData ? clientData.chatSessionId : null;
 
-          try {
-            // 2. Lưu tin nhắn vào DB
-            await ChatService.saveMessage(chatSessionId, data.message, "KhachHang");
-
-            // 3. Tìm phiên chat để lấy MaNV (Admin) đang phụ trách
-            const phienChat = await db.PhienChat.findByPk(chatSessionId);
-            if (phienChat && phienChat.MaNV) {
-              targetEmployeeId = phienChat.MaNV;
-            } else {
-              console.log(`❌ Không tìm thấy PhienChat hoặc MaNV cho session ${chatSessionId}`);
-              return; // Không tìm thấy admin phụ trách
-            }
-
-            // 4. Tìm socket của admin đó
-            const adminData = adminSockets.get(targetEmployeeId);
-
-            // 5. Gửi tin nhắn CHỈ cho admin đó
-            if (adminData && adminData.ws.readyState === WebSocket.OPEN) {
-              const messagePayload = JSON.stringify({
-                type: "client_message",
-                clientId: data.clientId,
-                message: data.message,
-              });
-              
-              adminData.ws.send(messagePayload);
-              console.log(`✅ Client message delivered to Admin ${targetEmployeeId}`);
-            } else {
-              console.log(`❌ Client ${data.clientId} sent message, but Admin ${targetEmployeeId} is not connected.`);
-              // (Tin nhắn đã được lưu vào DB, admin sẽ thấy khi tải lại)
-            }
-          } catch (error) {
-            console.error("❌ Error processing client message:", error);
+          // === FIX QUAN TRỌNG: CỨU TIN NHẮN CHUYỂN GIAO ===
+          // Nếu RAM chưa có SessionId (thường xảy ra ở tin nhắn thứ 3 khi vừa chuyển chế độ từ AI sang Admin)
+          // Ta phải tìm phiên chat đang hoạt động trong DB ngay lập tức.
+          if (!chatSessionId) {
+             const activeSession = await db.PhienChat.findOne({
+                where: { MaKH: clientId, TrangThai: 'DangHoatDong' },
+                order: [['ThoiGianBatDau', 'DESC']]
+             });
+             
+             if (activeSession) {
+                chatSessionId = activeSession.MaPhienChat;
+                // Cập nhật ngược lại vào RAM để các tin sau xử lý nhanh hơn
+                if (clientData) clientData.chatSessionId = chatSessionId;
+                console.log(`🔹 (Fix Lost Msg) Tìm thấy session DB ${chatSessionId} cho tin nhắn chuyển giao.`);
+             }
           }
-        } else {
-          // Client không có chatSessionId (tức là đang chat với AI)
-          // Không cần làm gì ở server (vì logic AI nằm ở client)
-          console.log("🔹 Client message (cho AI) received, no admin action.");
+
+          // 2. Nếu tìm được Session (Dù là từ RAM hay DB), LƯU NGAY LẬP TỨC
+          if (chatSessionId) {
+            // Lưu vào DB: Đây là bước quan trọng nhất để tin nhắn thứ 3 không bị mất
+            await ChatService.saveMessage(chatSessionId, data.message, "KhachHang");
+            console.log(`✅ Saved client message to DB (Session: ${chatSessionId})`);
+
+            // 3. Chỉ gửi WebSocket cho Admin NẾU đã có nhân viên phụ trách
+            // (Để tránh lỗi gửi tin cho null khi chưa ai nhận)
+            const phienChat = await db.PhienChat.findByPk(chatSessionId);
+            
+            if (phienChat && phienChat.MaNV) {
+              const targetEmployeeId = phienChat.MaNV;
+              const adminData = adminSockets.get(targetEmployeeId);
+
+              if (adminData && adminData.ws.readyState === WebSocket.OPEN) {
+                const messagePayload = JSON.stringify({
+                  type: "client_message",
+                  clientId: data.clientId,
+                  message: data.message,
+                });
+                adminData.ws.send(messagePayload);
+                console.log(`✅ Forwarded to Admin ${targetEmployeeId}`);
+              }
+            } else {
+              // Nếu chưa có MaNV (đang chat với AI), ta chỉ lưu DB thôi, không làm gì thêm
+              // Tin nhắn này sẽ hiện lên khi Admin bấm "Nhận hỗ trợ" và tải lịch sử về
+              console.log(`🔹 Tin nhắn trong phiên AI (Session ${chatSessionId}) - Đã lưu DB, không gửi Admin.`);
+            }
+          } else {
+             // Trường hợp cực hữu: Khách chat mà không có phiên nào đang mở
+             console.warn(`⚠️ Client ${clientId} chat nhưng không tìm thấy phiên DangHoatDong. Không thể lưu.`);
+          }
+
+        } catch (error) {
+          console.error("❌ Error processing client message:", error);
         }
         return;
       }
