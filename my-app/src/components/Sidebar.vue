@@ -40,7 +40,7 @@
             <span v-show="isOpen">Hội thoại</span>
           </transition>
           <transition name="fade-slide">
-            <span v-show="isOpen" class="badge bg-danger rounded-pill ms-auto">1</span>
+            <span v-show="isOpen" class="badge bg-danger rounded-pill ms-auto"></span>
           </transition>
         </a>
       </li>

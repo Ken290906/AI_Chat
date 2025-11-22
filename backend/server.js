@@ -11,6 +11,7 @@ import { fileURLToPath } from "url";
 // Import routes và WebSocket
 import chatRoutes from "./routes/chat.js";
 import nhatKyXuLyRoutes from "./routes/nhatkyxuly.js";
+import tomTatRoutes from './routes/tomTatPhienChat.js';
 import authRoutes from "./routes/auth.js";
 import dashboardRoutes from "./routes/dashboard.js";
 import { setupWebSocket } from "./websocket/websocket.js";
@@ -77,6 +78,7 @@ app.use(express.json());
 // ✅ Gắn routes
 app.use("/api/chat", chatRoutes);
 app.use("/api", nhatKyXuLyRoutes);
+app.use('/api', tomTatRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 
