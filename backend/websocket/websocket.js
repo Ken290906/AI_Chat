@@ -157,7 +157,7 @@ export function setupWebSocket(server) {
              // Tùy chọn: Nếu bạn vẫn muốn rung chuông admin nhưng không tạo dữ liệu rác
              // Thì có thể gọi notifyAdmin ở đây nhưng dùng existingWarning.
              // Tuy nhiên, tốt nhất là return luôn để admin không bị nhận 2 thông báo.
-             return; 
+             //return; 
           }
 
           // === BƯỚC 3: Nếu chưa có cảnh báo nào, thì tạo mới (Logic cũ) ===
@@ -268,7 +268,7 @@ export function setupWebSocket(server) {
             // (Để tránh lỗi gửi tin cho null khi chưa ai nhận)
             const phienChat = await db.PhienChat.findByPk(chatSessionId);
             
-            if (phienChat && phienChat.MaNV) {
+            if (phienChat && phienChat.MaNV && phienChat.TrangThai === 'DangHoatDong') {
               const targetEmployeeId = phienChat.MaNV;
               const adminData = adminSockets.get(targetEmployeeId);
 
@@ -281,11 +281,10 @@ export function setupWebSocket(server) {
                 adminData.ws.send(messagePayload);
                 console.log(`✅ Forwarded to Admin ${targetEmployeeId}`);
               }
-            } else {
-              // Nếu chưa có MaNV (đang chat với AI), ta chỉ lưu DB thôi, không làm gì thêm
-              // Tin nhắn này sẽ hiện lên khi Admin bấm "Nhận hỗ trợ" và tải lịch sử về
-              console.log(`🔹 Tin nhắn trong phiên AI (Session ${chatSessionId}) - Đã lưu DB, không gửi Admin.`);
-            }
+          } else {
+              // Nếu chưa DangHoatDong, chỉ lưu DB (đã làm ở trên), không gửi Socket
+              console.log(`🔹 Message saved to DB but NOT sent to Admin (Status: ${phienChat ? phienChat.TrangThai : 'null'})`);
+          }
           } else {
              // Trường hợp cực hữu: Khách chat mà không có phiên nào đang mở
              console.warn(`⚠️ Client ${clientId} chat nhưng không tìm thấy phiên DangHoatDong. Không thể lưu.`);
