@@ -38,247 +38,75 @@
   </div>
 </template>
 
-<script>
-import axios from "axios";
-import Header from '../components/Header.vue'
-import Sidebar from '../components/Sidebar.vue'
-import ToastNotification from '../components/ToastNotification.vue'
+<script setup>
+import { ref, onMounted, computed } from 'vue';
+import { storeToRefs } from 'pinia';
+import { useMainStore } from '../stores/mainStore';
+import { useRouter } from 'vue-router';
 
-export default {
-  name: 'AdminLayout',
-  components: {
-    Header,
-    Sidebar,
-    ToastNotification,
-  },
-  data() {
-    return {
-      ws: null,
-      employee: null,
-      clients: [],
-      notifications: [],
-      activeClientIdForChat: null,
-      isSidebarOpen: true,
-      activeTab: 'chat'
-    }
-  },
-  mounted() {
-    const savedEmployee = localStorage.getItem('employee');
-    if (!savedEmployee) {
-      this.$router.push('/login');
-      return;
-    }
-    try {
-      this.employee = JSON.parse(savedEmployee);
-      this.connectWebSocket();
-    } catch (error) {
-      console.error('Error parsing employee data:', error);
-      this.$router.push('/login');
-    }
-  },
-  methods: {
-    connectWebSocket() {
-      this.ws = new WebSocket("ws://localhost:3000");
+import Header from '../components/Header.vue';
+import Sidebar from '../components/Sidebar.vue';
+import ToastNotification from '../components/ToastNotification.vue';
 
-      this.ws.onopen = () => {
-        console.log("✅ Admin WebSocket connected as:", this.employee.HoTen);
-        this.ws.send(JSON.stringify({ 
-          type: "admin_register",
-          employeeId: this.employee.MaNV
-        }));
-      };
+const mainStore = useMainStore();
+const router = useRouter();
 
-      this.ws.onmessage = async (event) => {
-        const data = JSON.parse(event.data);
-        console.log("WebSocket message received in AdminLayout:", data);
+// Reactive state from the store
+const { 
+  employee, 
+  clients, 
+  notifications, 
+  activeClientIdForChat,
+  ws // Direct access for passing as prop
+} = storeToRefs(mainStore);
 
-        if (data.type === "support_request") {
-          // --- THAY ĐỔI: BỎ addOrUpdateClient KHỎI ĐÂY ---
-          // const client = await this.addOrUpdateClient(data.clientId, true, data.canhBaoId); // <-- XÓA DÒNG NÀY
+// Actions from the store
+const { 
+  initializeStore, 
+  acceptRequest, 
+  markAsRead, 
+  setActiveClient 
+} = mainStore;
 
-          // CHỈ LẤY TÊN ĐỂ HIỂN THỊ THÔNG BÁO
-          let clientName = `Khách ${data.clientId}`; // Tên tạm thời
-          try {
-            // Gọi API thủ công để lấy tên
-            const response = await axios.get(`http://localhost:3000/api/auth/client/${data.clientId}`);
-            clientName = response.data.HoTen; // Lấy tên thật
-          } catch (error) {
-             console.error("❌ (AdminLayout) Error fetching client name for notification:", error);
-          }
-          // --- KẾT THÚC THAY ĐỔI ---
+// Local state for UI that doesn't belong in the store
+const isSidebarOpen = ref(true);
+const activeTab = ref('chat');
+const toastRef = ref(null); // Ref for the toast component
 
-          // Show toast
-          this.$refs.toastRef.show(
-            `Khách hàng ${clientName} cần hỗ trợ.`, // Dùng tên vừa fetch
-            'warning', // type
-            'Yêu cầu hỗ trợ mới' // title
-          );
-          // Add to notification center
-          this.notifications.unshift({
-            id: `req_${data.clientId}_${Date.now()}`,
-            type: 'support_request',
-            clientId: data.clientId,
-            canhBaoId: data.canhBaoId, // <-- LƯU LẠI CanhBaoID
-            clientName: clientName, // Dùng tên vừa fetch
-            avatar: `https://i.pravatar.cc/40?u=${data.clientId}`,
-            time: new Date(),
-            is_read: false,
-          });
-        }
+// Lifecycle hook
+onMounted(() => {
+  initializeStore();
+});
 
-        if (data.type === "client_message") {
-          // Luôn gọi addOrUpdateClient để cập nhật tên fallback nếu có
-          const client = await this.addOrUpdateClient(data.clientId);
-            if (client) {
-            this.notifications.unshift({
-              id: `msg_${data.clientId}_${Date.now()}`,
-              type: 'message',
-              clientId: data.clientId,
-              name: client.name,
-              text: data.message,
-              avatar: `https://i.pravatar.cc/40?u=${data.clientId}`,
-              time: new Date(),
-              is_read: false,
-            });
-          }
-        }
+// Methods that call store actions or manage local UI state
+function handleAcceptRequest(notification) {
+  acceptRequest(notification);
+}
 
-        // Xử lý khi có admin KHÁC chấp nhận yêu cầu
-        if (data.type === "request_claimed") {
-          
-          console.log(`📢 (AdminLayout) Thu hồi thông báo có canhBaoId: ${data.canhBaoId}`);
-          
-          // 1. Thu hồi thông báo (Bạn đã có)
-          this.notifications = this.notifications.filter(
-            noti => noti.canhBaoId !== data.canhBaoId
-          );
+function handleMarkAsRead(notificationId) {
+  markAsRead(notificationId);
+}
 
-          // 2. [THÊM MỚI] Thu hồi client khỏi danh sách NẾU không phải mình chấp nhận
-          if (data.acceptedByEmployeeId !== this.employee.MaNV) {
-            console.log(`🔹 (AdminLayout) Xóa client ${data.clientId} khỏi danh sách vì NV khác đã nhận.`);
-            this.clients = this.clients.filter(c => c.id !== data.clientId);
-          }
-        }
-      };
-    },
+function handleSetActiveClient(client) {
+  setActiveClient(client.id);
+}
 
-    async addOrUpdateClient(clientId, hasRequest = false, canhBaoId = null) {
-      // 1. Kiểm tra xem client đã có trong danh sách chưa
-      let client = this.clients.find((c) => c.id === clientId);
+function toggleSidebar() {
+  isSidebarOpen.value = !isSidebarOpen.value;
+}
 
-      if (!client) {
-        // --- CLIENT CHƯA TỒN TẠI ---
-        // Tiến hành fetch thông tin
-        let newClientData;
-        try {
-          const response = await axios.get(`http://localhost:3000/api/auth/client/${clientId}`);
-          newClientData = { 
-            id: clientId, 
-            name: response.data.HoTen, // Lấy tên thật
-            hasRequest: hasRequest,
-            canhBaoId: canhBaoId 
-          };
-        } catch (error) {
-          // API lỗi, tạo tên fallback
-          console.error("❌ (AdminLayout) Error fetching client info:", error);
-          const fallbackData = { id: clientId, name: `Khách ${clientId}`}; // Tên fallback
-          newClientData = {
-            ...fallbackData,
-            hasRequest: hasRequest,
-            canhBaoId: canhBaoId
-          };
-        }
-        
-        // Thêm vào danh sách (Đây là nơi duy nhất 'push')
-        this.clients.push(newClientData);
-        return newClientData; // Trả về client mới
+function handleTabSelect(tab) {
+  activeTab.value = tab;
+  if (router.currentRoute.value.name?.toLowerCase() !== tab) {
+      router.push({ name: tab.charAt(0).toUpperCase() + tab.slice(1) });
+  }
+}
 
-      } else {
-        // --- CLIENT ĐÃ TỒN TẠI ---
-        
-        // Cập nhật trạng thái yêu cầu
-        if (hasRequest) {
-          client.hasRequest = true;
-          client.canhBaoId = canhBaoId;
-        }
-
-        // --- SỬA LỖI TÊN FALLBACK ---
-        // Nếu tên hiện tại là tên fallback, thử fetch lại tên thật
-        if (client.name.startsWith(`Khách `)) {
-          console.log(`🔹 (AdminLayout) Client ${clientId} đang dùng tên fallback. Thử fetch lại...`);
-          try {
-            const response = await axios.get(`http://localhost:3000/api/auth/client/${clientId}`);
-            if (response.data.HoTen) {
-              console.log(`✅ Cập nhật tên cho ${clientId} thành: ${response.data.HoTen}`);
-              client.name = response.data.HoTen; // Cập nhật tên thật
-            }
-          } catch (error) {
-            console.error(`❌ Vẫn lỗi khi fetch tên cho ${clientId}. Giữ tên fallback.`);
-          }
-        }
-        return client; // Trả về client đã cập nhật
-      }
-    },
-
-    async handleAcceptRequest(notification) {
-      const client = await this.addOrUpdateClient(
-        notification.clientId,
-        false, // hasRequest (sẽ được cập nhật ngay sau đây)
-        notification.canhBaoId
-      );
-      if (client) {
-        this.ws.send(JSON.stringify({
-          type: "admin_accept_request",
-          clientId: client.id,
-          employeeId: this.employee.MaNV,
-          canhBaoId: notification.canhBaoId // <-- GỬI ĐI CanhBaoID
-        }));
-        client.hasRequest = false;
-        
-        // Remove notification from list
-        this.notifications = this.notifications.filter(n => n.id !== notification.id);
-        
-        // Navigate to chat and set active client
-        this.activeClientIdForChat = client.id;
-        this.$router.push({ name: 'Chat' }).catch(err => {
-            if (err.name !== 'NavigationDuplicated') {
-                console.error(err);
-            }
-        });
-      }
-    },
-    
-    handleMarkAsRead(notificationId) {
-      const notification = this.notifications.find(n => n.id === notificationId);
-      if (notification) {
-        notification.is_read = true;
-      }
-    },
-
-    setActiveClient(client) {
-        this.activeClientIdForChat = client.id;
-    },
-
-    toggleSidebar() {
-      this.isSidebarOpen = !this.isSidebarOpen;
-    },
-
-    handleTabSelect(tab) {
-      this.activeTab = tab;
-      if (this.$route.name?.toLowerCase() !== tab) {
-          this.$router.push({ name: tab.charAt(0).toUpperCase() + tab.slice(1) });
-      }
-    },
-
-    // Hàm này giờ sẽ được kích hoạt bởi @support-request
-    handleSupportRequest(clientId) {
-      console.log(`Layout: Nhận được yêu cầu hỗ trợ từ ${clientId}`);
-      if (this.$refs.toastRef) {
-        this.$refs.toastRef.show(`📢 Khách hàng ${clientId} cần hỗ trợ!`, 'warning', 'Cảnh báo mới');
-      } else {
-        console.warn('ToastNotification chưa sẵn sàng!');
-      }
-    }
+// This function is for the Toast, which is a UI concern and can stay here.
+// It can be triggered by watching store state changes if needed.
+function handleSupportRequest(clientId) {
+  if (toastRef.value) {
+    toastRef.value.show(`📢 Khách hàng ${clientId} cần hỗ trợ!`, 'warning', 'Cảnh báo mới');
   }
 }
 </script>

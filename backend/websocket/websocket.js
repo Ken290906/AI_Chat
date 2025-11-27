@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from "ws"
 import db from "../models/index.js"
 import ChatService from "../services/chatService.js"
 import AIService from "../services/aiService.js"
+import ThongBaoService from "../services/thongBaoService.js";
 
 // ===== THAY ĐỔI 1: Quản lý Sockets ở phạm vi module =====
 // Chuyển các biến này ra ngoài để notifyAdmin có thể truy cập
@@ -112,86 +113,52 @@ export function setupWebSocket(server) {
         return
       }
 
-      // ===== THAY ĐỔI 5: Sửa SUPPORT REQUEST (gửi cho TẤT CẢ) =====
+      // ===== THAY ĐỔI 5: Sửa SUPPORT REQUEST (LƯU VÀO BẢNG THONGBAO) =====
       if (data.type === "support_request") {
-        console.log(`🚨 Support request from client: ${data.clientId}`)
+        console.log(`🚨 Support request from client: ${data.clientId}`);
         
-        let phienChatId = data.chatSessionId 
-        const clientId = data.clientId
+        let phienChatId = data.chatSessionId;
+        const clientId = data.clientId;
 
         try {
-          // === BƯỚC 1: Ưu tiên tìm phiên chat đang hoạt động (Fix lỗi tạo phiên 210/211) ===
-          // Nếu client không gửi session ID, hoặc gửi sai, ta tìm trong DB trước
+          // Tìm hoặc tạo phiên chat
           if (!phienChatId) {
              const activeSession = await db.PhienChat.findOne({
                 where: { MaKH: clientId, TrangThai: 'DangHoatDong' },
                 order: [['ThoiGianBatDau', 'DESC']] 
              });
-             
              if (activeSession) {
                 phienChatId = activeSession.MaPhienChat;
-                console.log(`🔹 Tìm thấy phiên chat đang hoạt động: ${phienChatId} (Sử dụng lại thay vì tạo mới)`);
+             } else {
+                const newSession = await ChatService.CreateChatSession(clientId, null, null);
+                phienChatId = newSession.MaPhienChat;
              }
           }
 
-          // Chỉ tạo mới nếu thực sự không tìm thấy
-          if (!phienChatId) {
-            console.log(`🔹 Không tìm thấy phiên cũ. Tạo phiên chat mới...`);
-            const newSession = await ChatService.CreateChatSession(clientId, null, null);
-            phienChatId = newSession.MaPhienChat;
-            console.log(`✅ Đã tạo phiên chat mới: ${phienChatId}`);
-          }
+          // Tạo một thông báo trong bảng `thongbao`
+          const notificationContent = `Khách hàng ${clientId} đang cần hỗ trợ gấp!`;
+          const newNotification = await ThongBaoService.createThongBao(phienChatId, notificationContent);
+          console.log(`✅ Created notification ${newNotification.MaThongBao} for support request.`);
 
-          // === BƯỚC 2: Chặn cảnh báo kép (Fix lỗi 115 và 116 cùng lúc) ===
-          // Kiểm tra xem phiên này đã có cảnh báo nào "ChuaXuLy" chưa?
-          // Logic: Nếu vừa bị "ai error" (115), nó sẽ tìm thấy và DỪNG LẠI, không tạo "need support" (116) nữa.
-          const existingWarning = await db.CanhBao.findOne({
-             where: { 
-                 MaPhienChat: phienChatId
-             }
+          // Gửi thông báo real-time đến TẤT CẢ admin
+          const notificationPayload = JSON.stringify({
+            type: "new_support_notification", // Sử dụng một loại mới để frontend có thể phân biệt
+            notification: newNotification,
+            clientId: clientId, // Vẫn gửi kèm để xử lý logic accept
+            canhBaoId: newNotification.MaThongBao // Dùng MaThongBao làm ID định danh
           });
 
-          if (existingWarning) {
-             console.log(`🛑 Đã tồn tại cảnh báo (ID: ${existingWarning.MaCB}, Loại: ${existingWarning.LoaiCanhBao}). Bỏ qua yêu cầu 'need support' để tránh spam.`);
-             
-             // Tùy chọn: Nếu bạn vẫn muốn rung chuông admin nhưng không tạo dữ liệu rác
-             // Thì có thể gọi notifyAdmin ở đây nhưng dùng existingWarning.
-             // Tuy nhiên, tốt nhất là return luôn để admin không bị nhận 2 thông báo.
-             //return; 
-          }
-
-          // === BƯỚC 3: Nếu chưa có cảnh báo nào, thì tạo mới (Logic cũ) ===
-          const canhBao = await ChatService.createWarning(
-            phienChatId, clientId, "need support",
-            `Khách ${clientId} chủ động yêu cầu hỗ trợ`
-          );
-
-          // Gửi thông báo socket
-          if (adminSockets.size > 0) {
-            let notifiedCount = 0;
-            const messagePayload = JSON.stringify({
-              type: "support_request",
-              clientId: clientId,
-              chatSessionId: phienChatId, 
-              canhBaoId: canhBao.MaCB, 
-              message: "Khách hàng cần hỗ trợ gấp!",
-            });
-            
-            for (const [employeeId, adminData] of adminSockets.entries()) {
-                if (adminData.ws.readyState === WebSocket.OPEN) {
-                    adminData.ws.send(messagePayload);
-                    notifiedCount++;
-                }
+          for (const [employeeId, adminData] of adminSockets.entries()) {
+            if (adminData.ws.readyState === WebSocket.OPEN) {
+              adminData.ws.send(notificationPayload);
             }
-            console.log(`📢 Sent support request to ${notifiedCount}/${adminSockets.size} admins (CB: ${canhBao.MaCB})`);
-          } else {
-            console.log("❌ No admin connected")
           }
+          console.log(`📢 Sent 'new_support_notification' to ${adminSockets.size} admins.`);
           
         } catch (error) {
           console.error("❌ Lỗi khi xử lý support_request:", error);
         }
-        return
+        return;
       }
       // =======================================================
 
@@ -264,6 +231,31 @@ export function setupWebSocket(server) {
             await ChatService.saveMessage(chatSessionId, data.message, "KhachHang");
             console.log(`✅ Saved client message to DB (Session: ${chatSessionId})`);
 
+            // =================================================
+            // TẠO THÔNG BÁO MỚI KHI KHÁCH HÀNG GỬI TIN NHẮN
+            // =================================================
+            const notificationContent = `Khách hàng ${clientId} vừa gửi một tin nhắn mới.`;
+            const newNotification = await ThongBaoService.createThongBao(chatSessionId, notificationContent);
+            console.log(`✅ Created notification ${newNotification.MaThongBao} for new message.`);
+
+            // Gửi thông báo real-time đến TẤT CẢ admin
+            const notificationPayload = JSON.stringify({
+              type: "new_message_notification",
+              notification: newNotification, // Gửi toàn bộ object thông báo mới
+            });
+
+            for (const [employeeId, adminData] of adminSockets.entries()) {
+              if (adminData.ws.readyState === WebSocket.OPEN) {
+                try {
+                  adminData.ws.send(notificationPayload);
+                } catch (error) {
+                  console.error(`❌ Lỗi gửi 'new_message_notification' cho admin ${employeeId}:`, error);
+                }
+              }
+            }
+            console.log(`📢 Sent 'new_message_notification' to ${adminSockets.size} admins.`);
+            // =================================================
+
             // 3. Chỉ gửi WebSocket cho Admin NẾU đã có nhân viên phụ trách
             // (Để tránh lỗi gửi tin cho null khi chưa ai nhận)
             const phienChat = await db.PhienChat.findByPk(chatSessionId);
@@ -297,98 +289,79 @@ export function setupWebSocket(server) {
       }
       // ================================================================
 
-      // ===== THAY ĐỔI 8: Sửa ADMIN ACCEPT REQUEST (Bug nghiêm trọng) =====
+      // ===== THAY ĐỔI 8: Sửa ADMIN ACCEPT REQUEST (Logic mới đơn giản hơn) =====
       if (data.type === "admin_accept_request") {
-        console.log(`✅ Admin accepted request:`, data); // Log toàn bộ data
+        console.log(`✅ Admin accepted request:`, data);
 
-        const client = clients.get(data.clientId);
-        if (client && client.ws.readyState === ws.OPEN) {
-          try {
-            const acceptingEmployeeId = data.employeeId;
-            const canhBaoId = data.canhBaoId; // Lấy CanhBao ID từ FE
+        const { clientId, employeeId, phienChatId, notificationId } = data;
+        const client = clients.get(clientId);
 
-            if (!acceptingEmployeeId || !canhBaoId) {
-              console.error("❌ Lỗi: Admin accept thiếu employeeId hoặc canhBaoId");
-              return;
-            }
+        if (!client || client.ws.readyState !== ws.OPEN) {
+          console.log(`❌ Client ${clientId} not found or disconnected`);
+          return;
+        }
+        if (!employeeId || !phienChatId || !notificationId) {
+          console.error("❌ Lỗi: Admin accept thiếu employeeId, phienChatId, hoặc notificationId");
+          return;
+        }
 
-            // Tìm thông tin admin
-            const adminData = adminSockets.get(acceptingEmployeeId);
-            if (!adminData || !adminData.employeeInfo) {
-              console.error(`❌ Lỗi: Admin ${acceptingEmployeeId} không tìm thấy thông tin socket.`);
-              return;
-            }
-            const acceptingEmployee = adminData.employeeInfo;
-
-            // --- BƯỚC 1: Tìm Cảnh Báo để lấy MaPhienChat GỐC ---
-            const canhBao = await ChatService.findWarningById(canhBaoId);
-            if (!canhBao) {
-                console.error(`❌ Lỗi: Không tìm thấy Cảnh Báo với ID: ${canhBaoId}`);
-                return;
-            }
-            // Lấy MaPhienChat GỐC (bị lỗi) từ bản ghi cảnh báo
-            const maPhienChatGoc = canhBao.MaPhienChat; 
-            console.log(`🔹 Lấy được MaPhienChat GỐC (${maPhienChatGoc}) từ CanhBao ID ${canhBaoId}`);
-
-            // --- BƯỚC 2: Tạo phiên chat MỚI (để hỗ trợ) ---
-            const phienChatMoi = await ChatService.CreateChatSession(
-              data.clientId,
-              acceptingEmployeeId,
-              data.clientName || null,
-            );
-
-            currentChatSession = phienChatMoi; // (Vẫn là điểm nghẽn)
-            client.chatSessionId = phienChatMoi.MaPhienChat; // Cập nhật phiên chat MỚI cho client
-
-            // --- BƯỚC 3: Gửi thông tin cho client ---
-            client.ws.send(
-              JSON.stringify({
-                type: "agent_accepted",
-                clientId: data.clientId,
-                chatSessionId: phienChatMoi.MaPhienChat, // Gửi ID phiên MỚI
-                employee: acceptingEmployee,
-              }),
-            );
-            
-            console.log(
-              `✅ Acceptance sent to client ${data.clientId} with NEW chat session: ${phienChatMoi.MaPhienChat}`,
-            );
-
-            // --- BƯỚC 4: Ghi Nhật ký với MaPhienChat GỐC ---
-            await ChatService.logAction(
-              acceptingEmployeeId,
-              "accept_request", // HanhDong
-              maPhienChatGoc, // mã phiên chat cần hỗ trợ
-              `NV ${acceptingEmployee.HoTen} chấp nhận hỗ trợ (từ CB ID: ${canhBaoId}). Tạo phiên mới: ${phienChatMoi.MaPhienChat}`, // GhiChu
-            );
-
-            // --- BƯỚC 5 (MỚI): Broadcast cho TẤT CẢ ADMINS biết là đã có người nhận ---
-            console.log(`📢 Broadcasting 'request_claimed' cho (CB ID: ${canhBaoId})`);
-            const claimPayload = JSON.stringify({
-              type: "request_claimed",
-              canhBaoId: canhBaoId,
-              clientId: data.clientId, // Gửi clientId để FE dễ tìm
-              acceptedByEmployeeId: acceptingEmployeeId,
-              acceptedByEmployeeName: acceptingEmployee.HoTen // (Tùy chọn) Gửi tên người nhận
-            });
-
-            // Lặp qua tất cả admin đang kết nối và gửi tin
-            for (const [employeeId, adminData] of adminSockets.entries()) {
-              if (adminData.ws.readyState === WebSocket.OPEN) {
-                try {
-                  adminData.ws.send(claimPayload);
-                } catch (error) {
-                  console.error(`❌ Lỗi gửi 'request_claimed' cho admin ${employeeId}:`, error);
-                }
-              }
-            }
-            // --- KẾT THÚC BROADCAST ---
-          } catch (error) {
-            console.error("❌ Error accepting chat:", error);
-            client.ws.send(JSON.stringify({ type: "error", message: "Lỗi khi chấp nhận yêu cầu" }));
+        try {
+          const adminData = adminSockets.get(employeeId);
+          if (!adminData || !adminData.employeeInfo) {
+            console.error(`❌ Lỗi: Admin ${employeeId} không tìm thấy thông tin socket.`);
+            return;
           }
-        } else {
-          console.log(`❌ Client ${data.clientId} not found or disconnected`);
+          const acceptingEmployee = adminData.employeeInfo;
+
+          // --- BƯỚC 1: Cập nhật phiên chat với nhân viên hỗ trợ ---
+          const [updatedCount] = await db.PhienChat.update(
+            { MaNV: employeeId, TrangThai: 'DangHoatDong' },
+            { where: { MaPhienChat: phienChatId } }
+          );
+
+          if (updatedCount === 0) {
+            console.error(`❌ Không tìm thấy hoặc không thể cập nhật PhienChat ID: ${phienChatId}`);
+            return;
+          }
+          
+          console.log(`✅ Assigned employee ${employeeId} to chat session ${phienChatId}.`);
+          client.chatSessionId = phienChatId; // Đảm bảo client có session ID đúng
+
+          // --- BƯỚC 2: Gửi thông tin cho client ---
+          client.ws.send(
+            JSON.stringify({
+              type: "agent_accepted",
+              clientId: clientId,
+              chatSessionId: phienChatId,
+              employee: acceptingEmployee,
+            }),
+          );
+          
+          // --- BƯỚC 3: Ghi Nhật ký ---
+          await ChatService.logAction(
+            employeeId,
+            "accept_request",
+            phienChatId,
+            `NV ${acceptingEmployee.HoTen} chấp nhận hỗ trợ cho phiên chat ${phienChatId}.`,
+          );
+
+          // --- BƯỚC 4: Broadcast cho TẤT CẢ ADMINS biết là đã có người nhận ---
+          const claimPayload = JSON.stringify({
+            type: "request_claimed",
+            notificationId: notificationId, // Dùng notificationId để FE xóa
+            acceptedByEmployeeId: employeeId,
+          });
+
+          for (const [empId, admData] of adminSockets.entries()) {
+            if (admData.ws.readyState === WebSocket.OPEN) {
+              admData.ws.send(claimPayload);
+            }
+          }
+          console.log(`📢 Broadcasted 'request_claimed' for notification ID: ${notificationId}`);
+
+        } catch (error) {
+          console.error("❌ Error accepting chat:", error);
+          client.ws.send(JSON.stringify({ type: "error", message: "Lỗi khi chấp nhận yêu cầu" }));
         }
         return;
       }

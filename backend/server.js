@@ -14,6 +14,7 @@ import nhatKyXuLyRoutes from "./routes/nhatkyxuly.js";
 import tomTatRoutes from './routes/tomTatPhienChat.js';
 import authRoutes from "./routes/auth.js";
 import dashboardRoutes from "./routes/dashboard.js";
+import thongBaoRoutes from "./routes/thongbao.js";
 import { setupWebSocket } from "./websocket/websocket.js";
 
 dotenv.config();
@@ -81,6 +82,7 @@ app.use("/api", nhatKyXuLyRoutes);
 app.use('/api', tomTatRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/thongbao", thongBaoRoutes);
 
 // =========================
 // ✅ KHỞI TẠO SERVER VÀ WEBSOCKET
