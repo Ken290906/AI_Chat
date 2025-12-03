@@ -16,10 +16,8 @@ export const chatWithAI = async (req, res) => {
     if (!clientId) {
       return res.status(400).json({ error: "clientId is required" });
     }
-
-    console.log(`👤 Khách ID: ${clientId}`);
-    console.log(`📩 Tin nhắn từ khách: ${message}`);
-
+    console.log(`Khách ID: ${clientId}`);
+    console.log(`Tin nhắn từ khách: ${message}`);
     // --- LOGIC QUẢN LÝ PHIÊN CHAT MỚI ---
     // (Giữ nguyên code tìm/tạo phiên chat của bạn)
     let session = null;
@@ -84,8 +82,8 @@ export const chatWithAI = async (req, res) => {
     });
 
   } catch (error) {
-    // ===== 🚨 ĐÂY LÀ NƠI XỬ LÝ KHI AI LỖI (TRƯỜNG HỢP 2) 🚨 =====
-    console.error("❌ ERROR in chatWithAI (AI FAILED):", error.message);
+    // ===== ĐÂY LÀ NƠI XỬ LÝ KHI AI LỖI (TRƯỜNG HỢP 2) =====
+    console.error("ERROR in chatWithAI (AI FAILED):", error.message);
 
     try {
       const ghiChu = `AI lỗi khi phục vụ ${clientId}: ${error.message}`;
@@ -94,7 +92,7 @@ export const chatWithAI = async (req, res) => {
       // Nếu lỗi xảy ra TRƯỚC khi `sessionId` được gán (ví dụ: CreateChatSession lỗi)
       // thì chúng ta không thể tạo cảnh báo có MaPhienChat.
       if (!sessionId) {
-        console.error("❌❌ LỖI NGHIÊM TRỌNG: AI Lỗi nhưng KHÔNG CÓ sessionId.");
+        console.error("LỖI NGHIÊM TRỌNG: AI Lỗi nhưng KHÔNG CÓ sessionId.");
         // Gửi lỗi chung chung cho client
         return res.status(500).json({ 
           error: "Lỗi hệ thống khi tạo phiên chat.",
@@ -121,7 +119,7 @@ export const chatWithAI = async (req, res) => {
     
     } catch (dbError) {
       // Lỗi này nghiêm trọng (lỗi khi đang xử lý lỗi)
-      console.error("❌❌ LỖI NGHIÊM TRỌNG: Không thể tạo Cảnh Báo:", dbError);
+      console.error("LỖI NGHIÊM TRỌNG: Không thể tạo Cảnh Báo:", dbError);
     }
 
     // BƯỚC 3: Gửi tin nhắn xin lỗi cho khách hàng (HTTP Response)

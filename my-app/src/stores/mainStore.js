@@ -111,28 +111,40 @@ export const useMainStore = defineStore('main', {
           });
         }
 
-        if (data.type === "new_support_notification") {
-          const newNoti = data.notification;
-          this.notifications.unshift({
-            id: newNoti.MaThongBao,
-            type: 'support_request',
-            phienChatId: newNoti.MaPhienChat,
-            clientId: data.clientId,
-            clientName: `Khách ${data.clientId}`,
-            text: newNoti.NoiDung,
-            avatar: `https://i.pravatar.cc/40?u=sup${data.clientId}`,
-            time: newNoti.ThoiGianTao,
-            is_read: false,
-          });
+        if (data.type === "support_request") { 
+            // Dữ liệu từ server (notifyAdmin) sẽ gửi: clientId, chatSessionId, canhBaoId, message
+            const newNoti = data; 
+            
+            this.notifications.unshift({
+                // Server gửi CanhBaoId, nên ta lưu ID này để lọc khi bị chấp nhận
+                id: newNoti.canhBaoId, 
+                type: 'support_request',
+                phienChatId: newNoti.chatSessionId,
+                clientId: newNoti.clientId,
+                clientName: `Khách ${newNoti.clientId}`,
+                text: newNoti.message, 
+                avatar: `https://i.pravatar.cc/40?u=sup${newNoti.clientId}`,
+                time: new Date(), // Sử dụng thời gian hiện tại
+                is_read: false,
+                canhBaoId: newNoti.canhBaoId // Lưu rõ ràng CanhBaoId
+            });
+            // Kích hoạt Toast Notification (vì toast không có quyền truy cập store)
+            // Cần hàm này được lắng nghe trong AdminLayout.vue
+            window.dispatchEvent(new CustomEvent('supportRequest', { detail: newNoti.clientId }));
+            
+            // Bổ sung: Khi nhận được yêu cầu, phải thêm client vào danh sách clients
+            this.addOrUpdateClient(newNoti.clientId);
         }
 
-        if (data.type === "request_claimed") {
-          this.notifications = this.notifications.filter(
-            noti => noti.id !== data.notificationId
-          );
-          if (data.acceptedByEmployeeId !== this.employee.MaNV) {
-            this.clients = this.clients.filter(c => c.id !== data.clientId);
-          }
+        if (data.type === "agent_accepted") {
+            // FIX QUAN TRỌNG: Lấy Session ID mới từ Server và gán vào client object
+            const clientIndex = this.clients.findIndex(c => c.id === data.clientId);
+            if (clientIndex !== -1) {
+                // Lưu ID phiên chat mới vào client object
+                this.clients[clientIndex].sessionId = data.chatSessionId; // <- Cần phải có
+                console.log(`✅ [Store] Client ${data.clientId} updated with new Session ID: ${data.chatSessionId}`);
+            }
+            this.setActiveClient(data.clientId);
         }
 
         if (data.type === "client_message") {
@@ -160,9 +172,10 @@ export const useMainStore = defineStore('main', {
           type: "admin_accept_request",
           clientId: notification.clientId,
           employeeId: this.employee.MaNV,
+          canhBaoId: notification.id, 
           phienChatId: notification.phienChatId,
-          notificationId: notification.id 
         }));
+        // Logic cập nhật Session ID sẽ nằm trong khối agent_accepted (trên)
         this.notifications = this.notifications.filter(n => n.id !== notification.id);
         this.setActiveClient(notification.clientId);
         router.push({ name: 'Chat' });
@@ -173,23 +186,21 @@ export const useMainStore = defineStore('main', {
       this.activeClientIdForChat = clientId;
     },
 
+    // FIX: Đảm bảo Client object có trường sessionId khi được tạo
     async addOrUpdateClient(clientId) {
       let client = this.clients.find((c) => c.id === clientId);
       if (client) {
-        if (client.name.startsWith(`Khách `)) {
-          try {
-            const response = await axios.get(`http://localhost:3000/api/auth/client/${clientId}`);
-            if (response.data.HoTen) client.name = response.data.HoTen;
-          } catch (error) { /* ignore */ }
-        }
+        // ... (logic fetch tên) ...
         return client;
       } else {
         let newClientData;
         try {
           const response = await axios.get(`http://localhost:3000/api/auth/client/${clientId}`);
-          newClientData = { id: clientId, name: response.data.HoTen };
+          // BỔ SUNG: Khởi tạo sessionId là null
+          newClientData = { id: clientId, name: response.data.HoTen, sessionId: null }; 
         } catch (error) {
-          newClientData = { id: clientId, name: `Khách ${clientId}`};
+          // BỔ SUNG: Khởi tạo sessionId là null
+          newClientData = { id: clientId, name: `Khách ${clientId}`, sessionId: null };
         }
         this.clients.push(newClientData);
         return newClientData;

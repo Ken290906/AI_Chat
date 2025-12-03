@@ -77,10 +77,10 @@ export class ChatService {
         NguoiGui: nguoiGui,
       })
 
-      console.log(`✅ Message saved: ${tinNhan.MaTinNhan}`)
+      console.log(`Message saved: ${tinNhan.MaTinNhan}`)
       return tinNhan
     } catch (error) {
-      console.error("❌ Lỗi lưu tin nhắn:", error)
+      console.error(" Lỗi lưu tin nhắn:", error)
       throw error
     }
   }
@@ -95,7 +95,7 @@ export class ChatService {
    */
   static async createWarning(chatSessionId, clientId, tenCanhBao = "need support", ghiChu = null) {
     try {
-      console.log(`🔹 Creating warning for chat: ${chatSessionId}, client: ${clientId}`);
+      console.log(`Creating warning for chat: ${chatSessionId}, client: ${clientId}`);
       
       const canhBao = await db.CanhBao.create({
         TenCB: tenCanhBao,
@@ -104,15 +104,14 @@ export class ChatService {
         MaPhienChat: chatSessionId, // LƯU LẠI PHIÊN CHAT (AI)
       });
 
-      console.log(`✅ Warning created: ${canhBao.MaCB}`);
+      console.log(`Warning created: ${canhBao.MaCB}`);
       return canhBao;
 
     } catch (error) {
-      console.error("❌ Lỗi khi tạo Cảnh Báo:", error);
+      console.error("Lỗi khi tạo Cảnh Báo:", error);
       throw error;
     }
   }
-
   // --- HÀM MỚI ĐỂ TÌM CẢNH BÁO ---
   /**
    * Tìm một Cảnh Báo bằng ID (MaCB)
@@ -121,15 +120,15 @@ export class ChatService {
    */
   static async findWarningById(canhBaoId) {
     try {
-      console.log(`🔹 Finding warning by ID: ${canhBaoId}`);
+      console.log(`Finding warning by ID: ${canhBaoId}`);
       const canhBao = await db.CanhBao.findByPk(canhBaoId);
       if (!canhBao) {
-        console.log(`⚠️ Warning not found: ${canhBaoId}`);
+        console.log(`Warning not found: ${canhBaoId}`);
         return null;
       }
       return canhBao;
     } catch (error) {
-      console.error("❌ Lỗi khi tìm Cảnh Báo:", error);
+      console.error("Lỗi khi tìm Cảnh Báo:", error);
       throw error; // Ném lỗi để websocket.js có thể bắt
     }
   }
@@ -145,7 +144,7 @@ export class ChatService {
   static async logAction(employeeId, action, chatSessionId = null, note = null) {
     try {
       console.log(
-        `🔹 Ghi nhật ký hành động cho NV ${employeeId}: ${action}`,
+        `Ghi nhật ký hành động cho NV ${employeeId}: ${action}`,
       )
 
       const logEntry = await db.NhatKyXuLy.create({
@@ -156,10 +155,10 @@ export class ChatService {
         // ThoiGian sẽ tự động được gán bởi CURRENT_TIMESTAMP (dựa theo schema)
       })
 
-      console.log(`✅ Đã ghi nhật ký hành động: ${logEntry.MaNhatKy}`)
+      console.log(`Đã ghi nhật ký hành động: ${logEntry.MaNhatKy}`)
       return logEntry
     } catch (error) {
-      console.error("❌ Lỗi khi ghi NhatKyXuLy:", error)
+      console.error("Lỗi khi ghi NhatKyXuLy:", error)
       // Không ném lỗi ra ngoài để tránh làm hỏng luồng chính
       // throw error;
     }
@@ -167,24 +166,24 @@ export class ChatService {
 
   static async getChatHistory(chatSessionId) {
     try {
-      console.log(`🔹 Getting chat history for: ${chatSessionId}`)
+      console.log(`Getting chat history for: ${chatSessionId}`)
 
       const messages = await db.TinNhan.findAll({
         where: { MaPhienChat: chatSessionId },
         order: [["ThoiGianGui", "ASC"]],
       })
 
-      console.log(`✅ Found ${messages.length} messages`)
+      console.log(`Found ${messages.length} messages`)
       return messages
     } catch (error) {
-      console.error("❌ Lỗi lấy lịch sử chat:", error)
+      console.error("Lỗi lấy lịch sử chat:", error)
       throw error
     }
   }
 
   static async endChatSession(chatSessionId, employeeId = null) {
     try {
-      console.log(`🔹 Ending chat session: ${chatSessionId}`)
+      console.log(`Ending chat session: ${chatSessionId}`)
 
       const phienChat = await db.PhienChat.findByPk(chatSessionId)
       if (phienChat) {
@@ -202,35 +201,35 @@ export class ChatService {
           })
         }
 
-        console.log(`✅ Chat session ended with status DaKetThuc`)
+        console.log(`Chat session ended with status DaKetThuc`)
       }
       return phienChat
     } catch (error) {
-      console.error("❌ Lỗi kết thúc chat:", error)
+      console.error("Lỗi kết thúc chat:", error)
       throw error
     }
   }
 
   static async pauseChatSession(chatSessionId) {
     try {
-      console.log(`🔹 Pausing chat session: ${chatSessionId}`)
+      console.log(`Pausing chat session: ${chatSessionId}`)
 
       const phienChat = await db.PhienChat.findByPk(chatSessionId)
       if (phienChat) {
         phienChat.TrangThai = "DangCho"
         await phienChat.save()
-        console.log(`✅ Chat session paused, status changed to DangCho`)
+        console.log(`Chat session paused, status changed to DangCho`)
       }
       return phienChat
     } catch (error) {
-      console.error("❌ Lỗi tạm dừng chat:", error)
+      console.error("Lỗi tạm dừng chat:", error)
       throw error
     }
   }
 
   static async getPreviousSessionMessages(currentChatSessionId, clientId) {
     try {
-      console.log(`🔹 Tìm phiên chat liền kề trước đó của khách: ${clientId}`);
+      console.log(`Tìm phiên chat liền kề trước đó của khách: ${clientId}`);
 
       // Bước 1: Tìm phiên chat gần nhất của khách này, nhưng KHÔNG PHẢI phiên hiện tại
       // Logic: Lấy tất cả phiên của MaKH=3, trừ phiên 173, sắp xếp giảm dần theo thời gian -> Lấy cái đầu tiên.
@@ -253,11 +252,11 @@ export class ChatService {
       });
 
       if (!previousSession) {
-        console.log("⚠️ Khách hàng này chưa có phiên chat nào trước đó.");
+        console.log("Khách hàng này chưa có phiên chat nào trước đó.");
         return [];
       }
 
-      console.log(`✅ Đã tìm thấy phiên liền kề: ${previousSession.MaPhienChat} (Ngày: ${previousSession.ThoiGianBatDau})`);
+      console.log(`Đã tìm thấy phiên liền kề: ${previousSession.MaPhienChat} (Ngày: ${previousSession.ThoiGianBatDau})`);
 
       // Bước 2: Lấy danh sách tin nhắn của phiên vừa tìm được
       const messages = await db.TinNhan.findAll({
@@ -267,7 +266,7 @@ export class ChatService {
 
       return messages; // Trả về danh sách tin nhắn
     } catch (error) {
-      console.error("❌ Lỗi lấy tin nhắn phiên trước:", error);
+      console.error("Lỗi lấy tin nhắn phiên trước:", error);
       throw error;
     }
   }
@@ -277,7 +276,7 @@ export class ChatService {
   // ================================================================
   static async getFullClientHistory(clientId) {
     try {
-      console.log(`🔹 Lấy toàn bộ tin nhắn của khách: ${clientId}`);
+      console.log(`Lấy toàn bộ tin nhắn của khách: ${clientId}`);
 
       // Lấy tin nhắn, JOIN với bảng PhienChat để lọc theo MaKH
       // Cách này tối ưu: Chỉ lấy tin nhắn thuộc về các phiên của khách hàng đó
@@ -293,10 +292,10 @@ export class ChatService {
         ]
       });
 
-      console.log(`✅ Đã lấy ${allMessages.length} tin nhắn toàn bộ lịch sử.`);
+      console.log(`Đã lấy ${allMessages.length} tin nhắn toàn bộ lịch sử.`);
       return allMessages;
     } catch (error) {
-      console.error("❌ Lỗi lấy toàn bộ lịch sử:", error);
+      console.error("Lỗi lấy toàn bộ lịch sử:", error);
       throw error;
     }
   }
