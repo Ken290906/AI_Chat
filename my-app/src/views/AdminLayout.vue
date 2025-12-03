@@ -27,7 +27,7 @@
                 :employee="employee"
                 :clients="clients"
                 :active-client-id="activeClientIdForChat"
-                @select-client="setActiveClient"
+                @select-client="handleSelectClient" 
                 @support-request="handleSupportRequest" 
               />
             </keep-alive>
@@ -87,7 +87,7 @@ function handleMarkAsRead(notificationId) {
   markAsRead(notificationId);
 }
 
-function handleSetActiveClient(client) {
+function handleSelectClient(client) {
   setActiveClient(client.id);
 }
 
