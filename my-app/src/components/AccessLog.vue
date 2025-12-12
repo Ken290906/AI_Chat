@@ -16,7 +16,7 @@
             @click.prevent="switchTab('access_logs')"
           >
             <i class="bi bi-journal-text me-2"></i>
-            <span>Nhật ký truy cập</span>
+            <span>Nhật ký xử lý</span>
           </a>
         </li>
         <li class="nav-item">
@@ -54,10 +54,10 @@
             
             <div class="d-flex align-items-center gap-2">
               <select class="form-select border-0 bg-light py-2" v-model="dateFilter" @change="applyDateFilter" style="min-width: 150px;">
-                <option value="all">📅 Tất cả thời gian</option>
-                <option value="today">📅 Hôm nay</option>
-                <option value="thisWeek">📅 Tuần này</option>
-                <option value="thisMonth">📅 Tháng này</option>
+                <option value="all">Tất cả thời gian</option>
+                <option value="today">Hôm nay</option>
+                <option value="thisWeek">Tuần này</option>
+                <option value="thisMonth">Tháng này</option>
               </select>
               <button class="btn btn-light rounded-circle p-2 refresh-btn" @click="fetchLogs" title="Làm mới">
                 <i class="bi bi-arrow-clockwise text-primary"></i>
@@ -167,10 +167,10 @@
 
             <div class="d-flex align-items-center gap-2">
                <select class="form-select border-0 bg-light py-2" v-model="summaryDateFilter" @change="applySummaryDateFilter" style="min-width: 150px;">
-                <option value="all">📅 Tất cả thời gian</option>
-                <option value="today">📅 Hôm nay</option>
-                <option value="thisWeek">📅 Tuần này</option>
-                <option value="thisMonth">📅 Tháng này</option>
+                <option value="all">Tất cả thời gian</option>
+                <option value="today">Hôm nay</option>
+                <option value="thisWeek">Tuần này</option>
+                <option value="thisMonth">Tháng này</option>
               </select>
 
               <button class="btn btn-light rounded-circle p-2 refresh-btn" @click="fetchChatSummaries" title="Làm mới">

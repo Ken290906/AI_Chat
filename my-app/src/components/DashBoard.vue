@@ -8,10 +8,6 @@
           <i class="bi bi-download"></i>
           Xuất báo cáo
         </button>
-        <button class="btn btn-primary">
-          <i class="bi bi-plus-circle"></i>
-          Tạo cảnh báo
-        </button>
       </div>
     </div>
 
@@ -24,7 +20,7 @@
           </div>
           <div class="kpi-info">
             <h3>{{ totalWarnings }}</h3>
-            <p>Cảnh báo trong ngày</p>
+            <p>tổng số cảnh báo</p>
           </div>
         </div>
       </div>
