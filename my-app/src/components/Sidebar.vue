@@ -50,7 +50,7 @@
           @click.prevent="setActiveTab('settings')">
           <i class="bi bi-gear me-2"></i>
           <transition name="fade-slide">
-            <span v-show="isOpen">Thiết lập</span>
+            <span v-show="isOpen">Nhật Ký</span>
           </transition>
         </a>
       </li>
