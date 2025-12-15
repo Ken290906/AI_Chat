@@ -98,6 +98,7 @@
 <script>
 import axios from "axios";
 import VueMarkdown from 'vue3-markdown-it'
+import { nextTick } from 'vue'; // Import nextTick
 
 export default {
   name: "ClientChat",
@@ -126,20 +127,21 @@ export default {
       chatSessionId: null, // ID phiên chat hiện tại
     };
   },
-  watch: {
-    messages() {
-      this.$nextTick(() => {
-        this.scrollToBottom();
-      });
-    }
-  },
+  // Xóa watcher trên messages
+  // watch: {
+  //   messages() {
+  //     this.$nextTick(() => {
+  //       this.scrollToBottom();
+  //     });
+  //   }
+  // },
   async mounted() {
     const urlParams = new URLSearchParams(window.location.search);
     this.clientId = urlParams.get('clientId') || '1';
     
     await this.fetchClientInfo();
     this.connectWebSocket();
-    this.scrollToBottom();
+    this.scrollToBottom(true); // Cuộn xuống khi mounted
   },
   methods: {
     getAgentRole() {
@@ -204,11 +206,20 @@ export default {
       }
     },
     
-    scrollToBottom() {
-      const chatBody = this.$refs.chatBody;
-      if (chatBody) {
-        chatBody.scrollTo({ top: chatBody.scrollHeight, behavior: 'smooth' });
-      }
+    // Hàm cuộn thông minh
+    scrollToBottom(force = false) {
+      nextTick(() => {
+        const el = this.$refs.chatBody;
+        if (el) {
+          const scrollThreshold = 100; // Ngưỡng pixel để xác định người dùng có ở dưới cùng hay không
+          const isScrolledUp = el.scrollHeight - el.scrollTop - el.clientHeight > scrollThreshold;
+          
+          // Nếu `force` là true, hoặc nếu người dùng không cuộn lên, thì cuộn xuống
+          if (force || !isScrolledUp) {
+            el.scrollTop = el.scrollHeight;
+          }
+        }
+      });
     },
     
     connectWebSocket() {
@@ -216,6 +227,7 @@ export default {
 
       this.ws.onopen = () => {
         console.log("✅ WebSocket connected as client:", this.clientId);
+        this.isConnected = true;
         this.ws.send(JSON.stringify({ 
           type: "client_register", 
           clientId: this.clientId 
@@ -252,6 +264,7 @@ export default {
           if (connectingMsgIndex !== -1) {
             this.messages.splice(connectingMsgIndex, 1);
           }
+          this.scrollToBottom(true); // Cuộn xuống khi kết nối với nhân viên
         } else if (data.type === "agent_declined") {
           this.isAwaitingAdmin = false;
           if (connectingMsgIndex !== -1) {
@@ -264,12 +277,14 @@ export default {
           this.isAdminChat = false;
           this.promptCount = 0;
           this.employeeInfo = null;
+          this.scrollToBottom(true); // Cuộn xuống khi từ chối
         } else if (data.type === "admin_message") {
           this.messages.push({ 
             text: data.message.trim(), 
             isUser: false,
             timestamp: new Date()
           });
+          this.scrollToBottom(false); // Cuộn thông minh khi nhận tin nhắn admin
         }
       };
 
@@ -296,6 +311,7 @@ export default {
         id: 'connecting_message',
         timestamp: new Date()
       });
+      this.scrollToBottom(true); // Cuộn xuống khi yêu cầu hỗ trợ
     },
 
     async sendMessage() {
@@ -307,6 +323,7 @@ export default {
         timestamp: new Date()
       });
       this.newMessage = "";
+      this.scrollToBottom(true); // Cuộn xuống khi gửi tin nhắn
 
       if (this.isAdminChat) {
         if (text.toLowerCase() === 'gemma') {
@@ -319,6 +336,7 @@ export default {
             isUser: false,
             timestamp: new Date()
           });
+          this.scrollToBottom(true); // Cuộn xuống khi chuyển chế độ
           return;
         }
         this.ws.send(JSON.stringify({ type: "client_message", clientId: this.clientId, message: text }));
@@ -369,12 +387,14 @@ export default {
           isUser: false,
           timestamp: new Date()
         });
+        this.scrollToBottom(true); // Cuộn xuống khi nhận phản hồi AI
       } catch (error) {
         this.messages.push({ 
           text: "❌ Lỗi khi gửi tin nhắn tới AI.", 
           isUser: false,
           timestamp: new Date()
         });
+        this.scrollToBottom(true); // Cuộn xuống khi có lỗi AI
         this.requestSupport("☠️ AI đang gặp sự cố kỹ thuật. Hệ thống đang kết nối bạn với nhân viên hỗ trợ...");
       } finally {
         this.isTyping = false;

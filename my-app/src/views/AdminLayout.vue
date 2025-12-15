@@ -1,10 +1,6 @@
 <template>
   <div id="app-layout" :class="{'sidebar-collapsed': !isSidebarOpen}">
-    <Header 
-      :notifications="notifications"
-      @accept-request="handleAcceptRequest"
-      @mark-as-read="handleMarkAsRead"
-    />
+    <Header />
     <ToastNotification ref="toastRef" />
 
     <div class="main-content container-fluid">
@@ -39,7 +35,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useMainStore } from '../stores/mainStore';
 import { useRouter } from 'vue-router';
@@ -55,7 +51,6 @@ const router = useRouter();
 const { 
   employee, 
   clients, 
-  notifications, 
   activeClientIdForChat,
   ws // Direct access for passing as prop
 } = storeToRefs(mainStore);
@@ -63,8 +58,6 @@ const {
 // Actions from the store
 const { 
   initializeStore, 
-  acceptRequest, 
-  markAsRead, 
   setActiveClient 
 } = mainStore;
 
@@ -79,14 +72,6 @@ onMounted(() => {
 });
 
 // Methods that call store actions or manage local UI state
-function handleAcceptRequest(notification) {
-  acceptRequest(notification);
-}
-
-function handleMarkAsRead(notificationId) {
-  markAsRead(notificationId);
-}
-
 function handleSelectClient(client) {
   setActiveClient(client.id);
 }

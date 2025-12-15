@@ -8,13 +8,35 @@ export const useMainStore = defineStore('main', {
     employee: null,
     clients: [],
     notifications: [],
+    warnings: [], // Thêm state cho warnings
     activeClientIdForChat: null,
   }),
 
   getters: {
-    // Example getter
     unreadNotificationsCount: (state) => {
-      return state.notifications.filter(n => !n.is_read).length;
+      // Đếm tổng số thông báo và cảnh báo chưa đọc
+      const unreadNotifications = state.notifications.filter(n => !n.is_read).length;
+      const unreadWarnings = state.warnings.filter(w => !w.is_read).length;
+      return unreadNotifications + unreadWarnings;
+    },
+    // Getter đã được đơn giản hóa và tăng cường tính an toàn cho hàm sort
+    sortedCombinedNotifications(state) {
+      // Cả hai mảng giờ đều chứa các đối tượng đã được ánh xạ
+      const combined = [
+        ...state.notifications,
+        ...state.warnings
+      ];
+      // Sắp xếp tất cả theo thời gian, mới nhất lên đầu
+      return combined.sort((a, b) => {
+        const dateA = new Date(a.time);
+        const dateB = new Date(b.time);
+
+        // Xử lý trường hợp ngày không hợp lệ
+        if (isNaN(dateA.getTime())) return 1;
+        if (isNaN(dateB.getTime())) return -1;
+
+        return dateB - dateA;
+      });
     }
   },
 
@@ -32,6 +54,7 @@ export const useMainStore = defineStore('main', {
         this.employee = JSON.parse(savedEmployee);
         this.connectWebSocket();
         this.fetchNotifications();
+        this.fetchWarnings(); // Gọi fetch warnings
       } catch (error) {
         console.error('Error initializing store:', error);
         router.push('/login');
@@ -39,7 +62,7 @@ export const useMainStore = defineStore('main', {
     },
 
     // =================================
-    // NOTIFICATIONS
+    // NOTIFICATIONS & WARNINGS
     // =================================
     async fetchNotifications() {
       try {
@@ -61,15 +84,48 @@ export const useMainStore = defineStore('main', {
       }
     },
 
-    async markAsRead(notificationId) {
-      const notification = this.notifications.find(n => n.id === notificationId);
-      if (notification && !notification.is_read) {
-        try {
-          await axios.put(`http://localhost:3000/api/thongbao/${notificationId}/read`);
-          notification.is_read = true;
-          console.log(`✅ [Store] Marked notification ${notificationId} as read.`);
-        } catch (error) {
-          console.error(`❌ [Store] Error marking notification ${notificationId} as read:`, error);
+    // Sửa lại fetchWarnings để map dữ liệu ngay lập tức
+    async fetchWarnings() {
+      try {
+        const response = await axios.get("http://localhost:3000/api/dashboard/warnings");
+        this.warnings = response.data.map(w => ({
+          id: w.MaCanhBao,
+          type: 'warning',
+          text: w.NoiDung,
+          time: w.ThoiGianTao,
+          is_read: w.TrangThai === 'DaDoc',
+          phienChatId: w.MaPhienChat,
+          clientId: w.PhienChat?.MaKH,
+          clientName: w.PhienChat?.KhachHang?.HoTen || `Khách ${w.PhienChat?.MaKH}`,
+          phanLoai: w.PhanLoaiCanhBao?.PhanLoai, // Thêm phân loại
+          ghiChu: w.GhiChu, // Thêm ghi chú
+        }));
+        console.log("✅ [Store] Fetched initial warnings");
+      } catch (error) {
+        console.error("❌ [Store] Error fetching initial warnings:", error);
+      }
+    },
+
+    async markAsRead(notificationId, type) {
+      if (type === 'warning') {
+        const warning = this.warnings.find(w => w.id === notificationId);
+        if (warning && !warning.is_read) {
+          try {
+            await axios.put(`http://localhost:3000/api/canhbao/${notificationId}/read`);
+            warning.is_read = true;
+          } catch (error) {
+            console.error(`❌ [Store] Error marking warning ${notificationId} as read:`, error);
+          }
+        }
+      } else {
+        const notification = this.notifications.find(n => n.id === notificationId);
+        if (notification && !notification.is_read) {
+          try {
+            await axios.put(`http://localhost:3000/api/thongbao/${notificationId}/read`);
+            notification.is_read = true;
+          } catch (error) {
+            console.error(`❌ [Store] Error marking notification ${notificationId} as read:`, error);
+          }
         }
       }
     },
@@ -96,6 +152,23 @@ export const useMainStore = defineStore('main', {
         const data = JSON.parse(event.data);
         console.log("📨 [Store] WebSocket message received:", data);
 
+        if (data.type === "new_warning") {
+          // Dữ liệu warning từ websocket cũng cần được map
+          const newWarning = data.warning;
+          this.warnings.unshift({
+            id: newWarning.MaCanhBao,
+            type: 'warning',
+            text: newWarning.NoiDung,
+            time: newWarning.ThoiGianTao,
+            is_read: false,
+            phienChatId: newWarning.MaPhienChat,
+            clientId: newWarning.PhienChat?.MaKH,
+            clientName: newWarning.PhienChat?.KhachHang?.HoTen || `Khách ${newWarning.PhienChat?.MaKH}`,
+            phanLoai: newWarning.PhanLoaiCanhBao?.PhanLoai, // Thêm phân loại
+            ghiChu: newWarning.GhiChu, // Thêm ghi chú
+          });
+        }
+
         if (data.type === "new_message_notification") {
           const newNoti = data.notification;
           this.notifications.unshift({
@@ -112,11 +185,9 @@ export const useMainStore = defineStore('main', {
         }
 
         if (data.type === "support_request") { 
-            // Dữ liệu từ server (notifyAdmin) sẽ gửi: clientId, chatSessionId, canhBaoId, message
             const newNoti = data; 
             
             this.notifications.unshift({
-                // Server gửi CanhBaoId, nên ta lưu ID này để lọc khi bị chấp nhận
                 id: newNoti.canhBaoId, 
                 type: 'support_request',
                 phienChatId: newNoti.chatSessionId,
@@ -124,24 +195,18 @@ export const useMainStore = defineStore('main', {
                 clientName: `Khách ${newNoti.clientId}`,
                 text: newNoti.message, 
                 avatar: `https://i.pravatar.cc/40?u=sup${newNoti.clientId}`,
-                time: new Date(), // Sử dụng thời gian hiện tại
+                time: new Date(),
                 is_read: false,
-                canhBaoId: newNoti.canhBaoId // Lưu rõ ràng CanhBaoId
+                canhBaoId: newNoti.canhBaoId
             });
-            // Kích hoạt Toast Notification (vì toast không có quyền truy cập store)
-            // Cần hàm này được lắng nghe trong AdminLayout.vue
             window.dispatchEvent(new CustomEvent('supportRequest', { detail: newNoti.clientId }));
-            
-            // Bổ sung: Khi nhận được yêu cầu, phải thêm client vào danh sách clients
             this.addOrUpdateClient(newNoti.clientId);
         }
 
         if (data.type === "agent_accepted") {
-            // FIX QUAN TRỌNG: Lấy Session ID mới từ Server và gán vào client object
             const clientIndex = this.clients.findIndex(c => c.id === data.clientId);
             if (clientIndex !== -1) {
-                // Lưu ID phiên chat mới vào client object
-                this.clients[clientIndex].sessionId = data.chatSessionId; // <- Cần phải có
+                this.clients[clientIndex].sessionId = data.chatSessionId;
                 console.log(`✅ [Store] Client ${data.clientId} updated with new Session ID: ${data.chatSessionId}`);
             }
             this.setActiveClient(data.clientId);
@@ -154,7 +219,6 @@ export const useMainStore = defineStore('main', {
 
       this.ws.onclose = () => {
         console.log("🔴 [Store] WebSocket disconnected.");
-        // Optional: attempt to reconnect
       };
 
       this.ws.onerror = (error) => {
@@ -175,7 +239,6 @@ export const useMainStore = defineStore('main', {
           canhBaoId: notification.id, 
           phienChatId: notification.phienChatId,
         }));
-        // Logic cập nhật Session ID sẽ nằm trong khối agent_accepted (trên)
         this.notifications = this.notifications.filter(n => n.id !== notification.id);
         this.setActiveClient(notification.clientId);
         router.push({ name: 'Chat' });
@@ -186,20 +249,16 @@ export const useMainStore = defineStore('main', {
       this.activeClientIdForChat = clientId;
     },
 
-    // FIX: Đảm bảo Client object có trường sessionId khi được tạo
     async addOrUpdateClient(clientId) {
       let client = this.clients.find((c) => c.id === clientId);
       if (client) {
-        // ... (logic fetch tên) ...
         return client;
       } else {
         let newClientData;
         try {
           const response = await axios.get(`http://localhost:3000/api/auth/client/${clientId}`);
-          // BỔ SUNG: Khởi tạo sessionId là null
           newClientData = { id: clientId, name: response.data.HoTen, sessionId: null }; 
         } catch (error) {
-          // BỔ SUNG: Khởi tạo sessionId là null
           newClientData = { id: clientId, name: `Khách ${clientId}`, sessionId: null };
         }
         this.clients.push(newClientData);

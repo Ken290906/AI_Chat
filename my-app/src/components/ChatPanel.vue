@@ -183,7 +183,8 @@ export default {
               isAdmin: false,
               isBot: false
           });
-          this.scrollToBottom();
+          // Cuộn thông minh khi nhận tin nhắn
+          this.scrollToBottom(false);
         }
         // Handle request_claimed...
     },
@@ -192,48 +193,44 @@ export default {
       this.$emit('select-client', client);
     },
 
-    // === 1. HÀM LẤY LỊCH SỬ PHIÊN LIỀN KỀ (QUAN TRỌNG) ===
     async loadMessageHistory(clientId, currentSessionId) {
-      // Nếu đã load rồi thì thôi, tránh spam API
-      if (this.historyLoadedMap[clientId]) return;
+      if (this.historyLoadedMap[clientId]) {
+        this.scrollToBottom(true); // Nếu chỉ chọn lại client, vẫn scroll xuống
+        return;
+      };
       
-      // Nếu chưa có mảng hội thoại thì khởi tạo
       if (!this.allConversations[clientId]) {
         this.allConversations[clientId] = [];
       }
 
       this.isLoadingHistory = true;
       try {
-        // Gọi API Backend vừa tạo ở Bước 2
-        // Lưu ý: Sửa lại URL localhost nếu cổng của bạn khác
         const response = await axios.get(`http://localhost:3000/api/chat/history/previous`, {
             params: {
                 clientId: clientId,
-                currentSessionId: currentSessionId || 0 // Gửi ID phiên hiện tại lên để loại trừ
+                currentSessionId: currentSessionId || 0
             }
         });
 
         const rawMessages = response.data; 
 
-        // Map dữ liệu DB sang Vue
         const formattedMessages = rawMessages.map(msg => {
-            // NguoiGui trong DB là: 'HeThong', 'NhanVien', 'KhachHang'
             const isSystem = msg.NguoiGui === 'HeThong';
             const isEmployee = msg.NguoiGui === 'NhanVien';
             
             return {
                 text: msg.NoiDung,
-                isAdmin: isSystem || isEmployee, // Cả Bot và NV đều nằm bên phải
-                isBot: isSystem,                 // Cờ riêng để tô màu xám
+                isAdmin: isSystem || isEmployee,
+                isBot: isSystem,
                 createdAt: msg.ThoiGianGui
             };
         });
 
-        // Nối lịch sử vào ĐẦU mảng tin nhắn hiện tại
         this.allConversations[clientId] = [...formattedMessages, ...this.allConversations[clientId]];
         
-        this.historyLoadedMap[clientId] = true; // Đánh dấu đã load
-        this.scrollToBottom();
+        this.historyLoadedMap[clientId] = true;
+        // Cưỡng bức cuộn xuống khi tải lịch sử
+        this.scrollToBottom(true);
 
       } catch (error) {
         console.error("Lỗi tải lịch sử:", error);
@@ -242,7 +239,6 @@ export default {
       }
     },
 
-    // === 2. HÀM LẤY TOÀN BỘ LỊCH SỬ ===
     async loadFullHistory(clientId) {
         if(!confirm("Tải toàn bộ lịch sử chat của khách hàng này?")) return;
         
@@ -257,9 +253,9 @@ export default {
                 createdAt: msg.ThoiGianGui
             }));
 
-            // Ghi đè toàn bộ để xem full
             this.allConversations[clientId] = formattedMessages;
-            this.scrollToBottom();
+            // Cưỡng bức cuộn xuống khi tải lịch sử
+            this.scrollToBottom(true);
         } catch (e) {
             console.error("Lỗi full history:", e);
         }
@@ -278,7 +274,8 @@ export default {
         message: text,
       }));
       this.newMessage = "";
-      this.scrollToBottom();
+      // Cưỡng bức cuộn xuống khi gửi tin nhắn
+      this.scrollToBottom(true);
     },
     
     getLastMessage(clientId) {
@@ -288,11 +285,20 @@ export default {
       return lastMsg.isAdmin ? `Bạn: ${lastMsg.text}` : lastMsg.text;
     },
 
-    scrollToBottom() {
-        this.$nextTick(() => {
-            const container = this.$refs.chatBody;
-            if (container) container.scrollTop = container.scrollHeight;
-        });
+    scrollToBottom(force = false) {
+      this.$nextTick(() => {
+        const el = this.$refs.chatBody;
+        if (el) {
+          // Ngưỡng pixel để xác định người dùng có ở dưới cùng hay không
+          const scrollThreshold = 100; 
+          const isScrolledUp = el.scrollHeight - el.scrollTop - el.clientHeight > scrollThreshold;
+          
+          // Nếu `force` là true, hoặc nếu người dùng không cuộn lên, thì cuộn xuống
+          if (force || !isScrolledUp) {
+            el.scrollTop = el.scrollHeight;
+          }
+        }
+      });
     }
   },
 };

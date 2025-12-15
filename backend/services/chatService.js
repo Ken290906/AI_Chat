@@ -104,8 +104,16 @@ export class ChatService {
         MaPhienChat: chatSessionId, // LƯU LẠI PHIÊN CHAT (AI)
       });
 
-      console.log(`Warning created: ${canhBao.MaCB}`);
-      return canhBao;
+      // Sau khi tạo, fetch lại bản ghi để có đầy đủ các include cần thiết cho frontend
+      const fullCanhBao = await db.CanhBao.findByPk(canhBao.MaCB, {
+        include: [{
+          model: db.PhanLoaiCanhBao,
+          attributes: ['PhanLoai']
+        }]
+      });
+
+      console.log(`Warning created: ${fullCanhBao.MaCB}`);
+      return fullCanhBao;
 
     } catch (error) {
       console.error("Lỗi khi tạo Cảnh Báo:", error);
