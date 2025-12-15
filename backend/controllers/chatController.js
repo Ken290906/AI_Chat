@@ -109,12 +109,10 @@ export const chatWithAI = async (req, res) => {
       );
 
       // BƯỚC 2: Thông báo cho Admin qua WebSocket (dùng hàm export)
+      // Gửi dưới dạng 'new_warning' để frontend xử lý và hiển thị đúng
       notifyAdmin({
-        type: "support_request", // Admin FE vẫn lắng nghe type này
-        clientId: clientId,
-        chatSessionId: sessionId, // Đây chính là MaPhienChat của phiên AI
-        canhBaoId: canhBao.MaCB,  // Gửi kèm ID cảnh báo
-        message: `AI LỖI: Khách ${clientId} cần hỗ trợ ngay!`,
+        type: "new_warning", // THAY ĐỔI TỪ 'support_request' SANG 'new_warning'
+        warning: canhBao,    // Gửi toàn bộ đối tượng cảnh báo đã được hydrate
       });
     
     } catch (dbError) {

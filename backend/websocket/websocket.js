@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from "ws"
 import db from "../models/index.js"
 import ChatService from "../services/chatService.js"
 import AIService from "../services/aiService.js"
+import NotificationService from "../services/notificationService.js";
 
 // ===== THAY ĐỔI 1: Quản lý Sockets ở phạm vi module =====
 // Chuyển các biến này ra ngoài để notifyAdmin có thể truy cập
@@ -165,6 +166,12 @@ export function setupWebSocket(server) {
             `Khách ${clientId} chủ động yêu cầu hỗ trợ`
           );
 
+          // === BƯỚC 4: Tạo Thông Báo (MỚI) ===
+          const thongBao = await NotificationService.createNotification(
+            `Khách ${clientId} yêu cầu hỗ trợ`,
+            phienChatId
+          );
+
           // Gửi thông báo socket
           if (adminSockets.size > 0) {
             let notifiedCount = 0;
@@ -183,6 +190,24 @@ export function setupWebSocket(server) {
                 }
             }
             console.log(`📢 Sent support request to ${notifiedCount}/${adminSockets.size} admins (CB: ${canhBao.MaCB})`);
+
+            // Gửi thông báo loại "new_message_notification" (MỚI)
+            notifyAdmin({
+              type: "new_message_notification",
+              notification: {
+                id: thongBao.MaThongBao,
+                type: 'support_request', // Để frontend hiển thị icon hỗ trợ
+                phienChatId: thongBao.MaPhienChat,
+                clientId: thongBao.PhienChat?.MaKH,
+                clientName: thongBao.PhienChat?.KhachHang?.HoTen || `Khách ${thongBao.PhienChat?.MaKH}`,
+                text: thongBao.NoiDung,
+                time: thongBao.ThoiGianTao,
+                is_read: thongBao.TrangThai === 'DaDoc',
+                avatar: `https://i.pravatar.cc/40?u=sup${thongBao.PhienChat?.MaKH}`,
+              }
+            });
+            
+            console.log(`📢 Sent support request and new notification to admins (CB: ${canhBao.MaCB}, TB: ${thongBao.MaThongBao})`);
           } else {
             console.log("❌ No admin connected")
           }

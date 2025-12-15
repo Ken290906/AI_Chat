@@ -7,7 +7,7 @@
           <table class="table table-hover">
             <thead class="table-light">
               <tr>
-                <th scope="col">Mã CB</th>
+                <th scope="col">STT</th>
                 <th scope="col">Tên Cảnh Báo</th>
                 <th scope="col">Phân Loại</th>
                 <th scope="col">Ghi Chú</th>
@@ -16,8 +16,8 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="warning in warnings" :key="warning.MaCB" :class="getWarningClass(warning.PhanLoaiCanhBao.PhanLoai)">
-                <td>{{ warning.MaCB }}</td>
+              <tr v-for="(warning, index) in warnings" :key="warning.MaCB" :class="getWarningClass(warning.PhanLoaiCanhBao.PhanLoai)">
+                <td>{{ index + 1 }}</td>
                 <td>{{ warning.TenCB }}</td>
                 <td>
                   <span :class="getBadgeClass(warning.PhanLoaiCanhBao.PhanLoai)">
@@ -50,7 +50,17 @@ export default {
   async mounted() {
     try {
       const response = await axios.get('http://localhost:3000/api/dashboard/warnings');
-      this.warnings = response.data;
+      // Sắp xếp dữ liệu theo ThoiGianTao giảm dần (mới nhất lên đầu)
+      this.warnings = response.data.sort((a, b) => {
+        const dateA = new Date(a.ThoiGianTao);
+        const dateB = new Date(b.ThoiGianTao);
+
+        // Xử lý trường hợp ngày không hợp lệ
+        if (isNaN(dateA.getTime())) return 1;
+        if (isNaN(dateB.getTime())) return -1;
+
+        return dateB - dateA;
+      });
     } catch (error) {
       console.error('Lỗi khi lấy dữ liệu cảnh báo:', error);
     }
