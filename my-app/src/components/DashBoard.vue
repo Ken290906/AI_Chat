@@ -1,17 +1,15 @@
 <template>
   <div class="dashboard-container">
-    <!-- Header -->
     <div class="dashboard-header">
       <h2 class="dashboard-title">Tổng quan</h2>
       <div class="header-actions">
-        <button class="btn btn-outline">
+        <button class="btn btn-outline" @click="exportReport">
           <i class="bi bi-download"></i>
           Xuất báo cáo
         </button>
       </div>
     </div>
 
-    <!-- KPI Stats Grid -->
     <div class="kpi-grid">
       <div class="kpi-card warning">
         <div class="kpi-content">
@@ -62,9 +60,7 @@
       </div>
     </div>
 
-    <!-- Charts Section -->
     <div class="charts-section">
-      <!-- Phân loại cảnh báo theo nội dung -->
       <div class="chart-card">
         <div class="chart-header">
           <h4>Phân loại cảnh báo theo nội dung</h4>
@@ -88,7 +84,6 @@
         </div>
       </div>
 
-      <!-- Phân loại cảnh báo theo kênh -->
       <div class="chart-card">
         <div class="chart-header">
           <h4>Phân phối trạng thái phiên chat</h4>
@@ -109,11 +104,10 @@
       </div>
     </div>
 
-    <!-- Recent Alerts -->
     <div class="recent-section">
       <div class="recent-card">
         <div class="chart-header">
-          <h4>Cảnh báo gần đây</h4>
+          <h4>Hoạt động gần đây</h4>
           <button class="btn-text">Xem tất cả</button>
         </div>
         <div class="recent-list">
@@ -137,70 +131,58 @@
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
 
+// Khai báo Ref
 const totalChats = ref(0);
 const totalMessages = ref(0);
 const totalCustomers = ref(0);
 const totalWarnings = ref(0);
-const chatsOverTime = ref([]);
 const chatStatusDistribution = ref([]);
-const recentChats = ref([]);
-const topEmployees = ref([]);
 const warningTypes = ref([]);
 const recentActivities = ref([]);
 
 const API_BASE_URL = 'http://localhost:3000/api/dashboard';
 
+// Ánh xạ màu cho trạng thái chat
+const STATUS_COLORS = {
+  'DangCho': '#ffc107',
+  'DangHoatDong': '#17a2b8',
+  'DaKetThuc': '#28a745',
+};
+
+// Hàm lấy dữ liệu Dashboard
 const fetchData = async () => {
   try {
-    const [
-      totalChatsRes,
-      totalMessagesRes,
-      totalCustomersRes,
-      totalWarningsRes,
-      chatsOverTimeRes,
-      chatStatusDistributionRes,
-      recentChatsRes,
-      topEmployeesRes,
-      warningTypesRes,
-      recentActivitiesRes,
-    ] = await Promise.all([
-      axios.get(`${API_BASE_URL}/total-chats`),
-      axios.get(`${API_BASE_URL}/total-messages`),
-      axios.get(`${API_BASE_URL}/total-customers`),
-      axios.get(`${API_BASE_URL}/total-warnings`),
-      axios.get(`${API_BASE_URL}/chats-over-time`),
-      axios.get(`${API_BASE_URL}/chat-status-distribution`),
-      axios.get(`${API_BASE_URL}/recent-chats`),
-      axios.get(`${API_BASE_URL}/top-employees`),
-      axios.get(`${API_BASE_URL}/warning-types`),
-      axios.get(`${API_BASE_URL}/recent-activities`),
-    ]);
-
-    totalChats.value = totalChatsRes.data.totalChats;
-    totalMessages.value = totalMessagesRes.data.totalMessages;
-    totalCustomers.value = totalCustomersRes.data.totalCustomers;
-    totalWarnings.value = totalWarningsRes.data.totalWarnings;
-    chatsOverTime.value = chatsOverTimeRes.data;
+    // Tối ưu: Chỉ lấy các API cần thiết cho việc hiển thị (loại bỏ các ref không dùng trên UI)
+    const endpoints = [
+      'total-chats', 'total-messages', 'total-customers', 'total-warnings',
+      'chat-status-distribution', 'warning-types', 'recent-activities'
+    ];
     
-    const statusColors = {
-      'DangCho': '#ffc107',
-      'DangHoatDong': '#17a2b8',
-      'DaKetThuc': '#28a745',
-    };
-    const totalStatusCount = chatStatusDistributionRes.data.reduce((sum, item) => sum + item.count, 0);
-    chatStatusDistribution.value = chatStatusDistributionRes.data.map(item => ({
+    const requests = endpoints.map(endpoint => axios.get(`${API_BASE_URL}/${endpoint}`));
+    const responses = await Promise.all(requests);
+
+    // Xử lý dữ liệu
+    totalChats.value = responses[0].data.totalChats;
+    totalMessages.value = responses[1].data.totalMessages;
+    totalCustomers.value = responses[2].data.totalCustomers;
+    totalWarnings.value = responses[3].data.totalWarnings;
+
+    // Xử lý Phân phối trạng thái chat
+    const chatStatusData = responses[4].data;
+    const totalStatusCount = chatStatusData.reduce((sum, item) => sum + item.count, 0);
+    chatStatusDistribution.value = chatStatusData.map(item => ({
       ...item,
       percentage: totalStatusCount > 0 ? ((item.count / totalStatusCount) * 100).toFixed(2) : 0,
-      color: statusColors[item.TrangThai] || '#ccc',
+      color: STATUS_COLORS[item.TrangThai] || '#ccc',
     }));
 
-    recentChats.value = recentChatsRes.data;
-    topEmployees.value = topEmployeesRes.data;
-    
+    // Xử lý Phân loại cảnh báo
+    const warningTypeData = responses[5].data;
     const warningColors = ['#ffc107', '#17a2b8', '#28a745', '#dc3545'];
     let offset = 0;
-    warningTypes.value = warningTypesRes.data.map((item, index) => {
+    warningTypes.value = warningTypeData.map((item, index) => {
       const currentOffset = offset;
+      // Giả sử API warning-types đã trả về value là tỷ lệ phần trăm (để khớp với code cũ và hình ảnh)
       offset += item.value;
       return {
         ...item,
@@ -209,10 +191,49 @@ const fetchData = async () => {
       };
     });
 
-    recentActivities.value = recentActivitiesRes.data;
+    // Xử lý Hoạt động gần đây
+    recentActivities.value = responses[6].data;
 
   } catch (error) {
-    console.error('Failed to fetch dashboard data:', error);
+    console.error('Lỗi khi lấy dữ liệu Dashboard:', error);
+  }
+};
+
+// Hàm xuất báo cáo Excel (Giữ nguyên)
+const exportReport = async () => {
+  try {
+    // Gọi API xuất báo cáo (API này đã được thêm vào dashboard.js ở bước trước)
+    const response = await axios.get(`${API_BASE_URL}/export-report`, {
+      responseType: 'blob', // Quan trọng: Đặt kiểu phản hồi là 'blob' để nhận dữ liệu file
+    });
+
+    // Tạo URL đối tượng blob
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    
+    // Lấy tên file từ header Content-Disposition
+    const contentDisposition = response.headers['content-disposition'];
+    let fileName = 'BaoCaoTongHopHoatDong.xlsx';
+    if (contentDisposition) {
+      const fileNameMatch = contentDisposition.match(/filename="(.+)"/i);
+      if (fileNameMatch && fileNameMatch.length === 2) {
+        // Chỉ lấy tên file nếu khớp
+        fileName = fileNameMatch[1].replace(/['"]/g, ''); // Loại bỏ dấu nháy kép/đơn
+      }
+    }
+
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.remove(); // Xóa liên kết sau khi tải
+    window.URL.revokeObjectURL(url); // Giải phóng bộ nhớ
+    
+    console.log('Xuất báo cáo thành công!');
+    
+  } catch (error) {
+    console.error('Lỗi khi xuất báo cáo:', error);
+    alert('Không thể xuất báo cáo. Vui lòng kiểm tra console.');
   }
 };
 
@@ -220,6 +241,7 @@ onMounted(fetchData);
 </script>
 
 <style scoped>
+/* Tất cả các ký tự khoảng trắng không phải ASCII đã được thay thế bằng khoảng trắng tiêu chuẩn */
 .dashboard-container {
   padding: 20px;
   background: var(--background-color);
@@ -413,9 +435,9 @@ onMounted(fetchData);
   width: 120px;
   height: 120px;
   border-radius: 50%;
-  background: conic-gradient(
-    var(--color) calc(var(--offset) * 1%) calc(var(--value) * 1%)
-  );
+  /* background: conic-gradient( */
+  /* var(--color) calc(var(--offset) * 1%) calc(var(--value) * 1%) */
+  /* ); */
   position: relative;
 }
 
