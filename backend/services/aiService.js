@@ -135,7 +135,7 @@ const AIService = {
       const data = await response.json();
       const summaryText = data.response.trim();
 
-      console.log(`✅ AI tóm tắt xong phiên ${chatSessionId}`);
+      console.log(`✅AI tóm tắt xong phiên ${chatSessionId}`);
 
       // Lưu vào bảng tomtatphienchat
       // Dùng findOrCreate để tránh trùng lặp nếu chạy 2 lần
