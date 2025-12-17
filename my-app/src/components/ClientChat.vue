@@ -389,13 +389,33 @@ export default {
         });
         this.scrollToBottom(true); // Cuộn xuống khi nhận phản hồi AI
       } catch (error) {
-        this.messages.push({ 
+        // ===== SỬA TẠI ĐÂY =====
+          this.messages.push({ 
           text: "❌ Lỗi khi gửi tin nhắn tới AI.", 
           isUser: false,
           timestamp: new Date()
         });
-        this.scrollToBottom(true); // Cuộn xuống khi có lỗi AI
-        this.requestSupport("☠️ AI đang gặp sự cố kỹ thuật. Hệ thống đang kết nối bạn với nhân viên hỗ trợ...");
+
+        this.isAdminChat = true;
+        this.isAwaitingAdmin = true;
+
+        this.messages.push({
+          text: "☠️ AI đang gặp sự cố kỹ thuật. Hệ thống đang kết nối bạn với nhân viên hỗ trợ...",
+          isUser: false,
+          id: 'connecting_message',
+          timestamp: new Date()
+        });
+        
+        this.scrollToBottom(true);
+
+        // GỬI TÍN HIỆU ĐỂ BACKEND BIẾT PHIÊN NÀY ĐANG LỖI AI VÀ CẦN HIỂN THỊ
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({
+                type: "ai_error_notify", // Tín hiệu mới, không phải support_request
+                clientId: this.clientId,
+                chatSessionId: this.chatSessionId
+            }));
+        }
       } finally {
         this.isTyping = false;
       }

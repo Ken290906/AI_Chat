@@ -104,10 +104,10 @@ export const chatWithAI = async (req, res) => {
       const canhBao = await ChatService.createWarning(
         sessionId, 
         clientId, 
-        "ai error", // Tên cảnh báo
-        ghiChu        // Ghi chú
+        "ai error", 
+        ghiChu,
+        1 // <--- MaPhanLoai: 1 (Lỗi kỹ thuật AI)
       );
-
       // BƯỚC 2: Thông báo cho Admin qua WebSocket (dùng hàm export)
       // Gửi dưới dạng 'new_warning' để frontend xử lý và hiển thị đúng
       notifyAdmin({

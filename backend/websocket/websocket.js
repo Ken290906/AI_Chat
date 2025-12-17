@@ -112,6 +112,25 @@ export function setupWebSocket(server) {
         return
       }
 
+      if (data.type === "ai_error_notify") {
+        const { clientId, chatSessionId } = data;
+        
+        // Tìm cảnh báo AI Error vừa được tạo trong DB để lấy thông tin
+        const existingWarning = await db.CanhBao.findOne({
+            where: { MaPhienChat: chatSessionId, TenCB: 'ai error' },
+            include: [{ model: db.PhanLoaiCanhBao, attributes: ['PhanLoai'] }]
+        });
+
+        if (existingWarning) {
+            // Gửi thông báo đến TẤT CẢ Admin để nổ chuông/hiển thị popup
+            notifyAdmin({
+                type: "new_warning",
+                warning: existingWarning
+            });
+            console.log(`🔔 Đã nổ chuông báo lỗi AI cho phiên #${chatSessionId}`);
+        }
+      }
+
       // ===== THAY ĐỔI 5: Sửa SUPPORT REQUEST (gửi cho TẤT CẢ) =====
       if (data.type === "support_request") {
         console.log(`🚨 Support request from client: ${data.clientId}`)
@@ -162,8 +181,11 @@ export function setupWebSocket(server) {
 
           // === BƯỚC 3: Nếu chưa có cảnh báo nào, thì tạo mới (Logic cũ) ===
           const canhBao = await ChatService.createWarning(
-            phienChatId, clientId, "need support",
-            `Khách ${clientId} chủ động yêu cầu hỗ trợ`
+            phienChatId, 
+            clientId, 
+            "need support",
+            `Khách ${clientId} chủ động yêu cầu hỗ trợ`,
+            2 // <--- MaPhanLoai: 2 (Người dùng yêu cầu)
           );
 
           // === BƯỚC 4: Tạo Thông Báo (MỚI) ===
