@@ -20,61 +20,52 @@
             
             <div v-if="showNotifications" class="notifications-dropdown">
               <div class="notifications-header">
-                <h6 class="mb-0 fw-bold">Thông báo & Cảnh báo</h6>
+                <h6 class="mb-0 fw-bold">Thông báo</h6>
               </div>
               
               <div class="notifications-list">
-                <div v-if="notificationsList.length === 0" class="text-center py-4 text-muted">
+                <div v-if="notifications.length === 0" class="text-center py-4 text-muted">
                   <i class="bi bi-bell-slash fs-1 mb-2"></i>
                   <p class="mb-0">Không có thông báo mới</p>
                 </div>
                 
                 <div 
                   v-else
-                  v-for="item in notificationsList" 
-                  :key="item.id + '-' + item.type"
+                  v-for="notification in notifications" 
+                  :key="notification.id"
                   class="notification-item"
-                  :class="{
-                    'is-unread': !item.is_read,
-                    'is-warning': item.type === 'warning'
-                  }"
-                  @click="handleItemClick(item)"
+                  :class="{'is-unread': !notification.is_read}"
+                  @click="handleItemClick(notification)"
                 >
                   <!-- Icon -->
                   <div class="notification-icon">
-                     <img v-if="item.avatar" :src="item.avatar" class="rounded-circle" alt="User" style="width: 40px; height: 40px;">
-                     <i v-else-if="item.type === 'warning'" class="bi bi-exclamation-triangle-fill fs-4"></i>
+                     <img v-if="notification.avatar" :src="notification.avatar" class="rounded-circle" alt="User" style="width: 40px; height: 40px;">
                      <i v-else class="bi bi-headset fs-4 text-primary"></i>
                   </div>
                   <!-- Content -->
                   <div class="notification-content">
                     <div class="notification-title">
-                      <span v-if="item.type === 'support_request'">
-                        <strong>{{ item.clientName }}</strong> đang cần hỗ trợ!
+                      <span v-if="notification.type === 'support_request'">
+                        <strong>{{ notification.clientName }}</strong> đang cần hỗ trợ!
                       </span>
-                      <div v-else-if="item.type === 'warning'">
-                        <strong class="d-block">Cảnh báo: {{ item.phanLoai || 'Chung' }}</strong>
-                        <div class="notification-details">{{ item.text }}</div>
-                        <div v-if="item.ghiChu" class="notification-sub-details text-muted">{{ item.ghiChu }}</div>
-                      </div>
                       <span v-else>
-                        <strong>{{ item.name }}</strong>: {{ item.text }}
+                        <strong>{{ notification.name }}</strong>: {{ notification.text }}
                       </span>
                     </div>
-                    <div class="notification-time">{{ formatTime(item.time) }}</div>
+                    <div class="notification-time">{{ formatTime(notification.time) }}</div>
                   </div>
                   <!-- Actions -->
                   <div class="notification-actions">
-                    <button v-if="item.type === 'support_request'" class="btn btn-sm btn-primary" @click.stop="acceptRequest(item)">
+                    <button v-if="notification.type === 'support_request' && !notification.is_read" class="btn btn-sm btn-primary" @click.stop="acceptRequest(notification)">
                       Đồng ý
                     </button>
-                    <span v-if="!item.is_read" class="unread-dot"></span>
+                    <span v-if="!notification.is_read" class="unread-dot"></span>
                   </div>
                 </div>
               </div>
               
               <div class="notifications-footer">
-                <router-link to="/warnings" class="view-all-link">Xem tất cả</router-link>
+                <router-link to="/notifications" class="view-all-link">Xem tất cả</router-link>
               </div>
             </div>
           </div>
@@ -110,7 +101,7 @@ export default {
   },
   computed: {
     ...mapState(useMainStore, {
-      notificationsList: 'sortedCombinedNotifications',
+      notifications: 'notifications', // Chỉ lấy notifications
       unreadCount: 'unreadNotificationsCount'
     }),
   },
@@ -141,11 +132,11 @@ export default {
       this.showNotifications = !this.showNotifications;
     },
 
-    handleItemClick(item) {
-      this.markAsRead(item.id, item.type);
-      // Nếu là tin nhắn hoặc cảnh báo, có thể chuyển hướng đến trang chat
-      if (item.type === 'message' || item.type === 'warning') {
-        // this.$router.push({ name: 'Chat' });
+    handleItemClick(notification) { // Đổi tên item thành notification
+      this.markAsRead(notification.id, notification.type);
+      // Optional: navigate to chat on message click
+      if (notification.type === 'message' || notification.type === 'support_request') {
+        // this.$router.push({ name: 'Chat' }); // Có thể chuyển hướng đến trang chat
       }
     },
 
@@ -266,33 +257,5 @@ export default {
 .view-all-link {
   font-size: 0.9rem;
   text-decoration: none;
-}
-
-/* Cải tiến giao diện cho Cảnh báo */
-.notification-item.is-warning .notification-icon .bi-exclamation-triangle-fill {
-  color: #ffc107 !important;
-}
-.notification-item.is-warning .notification-title strong {
-  color: #856404;
-}
-.notification-item.is-warning.is-unread {
-  background-color: #fff3cd;
-  border-left: 4px solid #ffc107;
-}
-.notification-item.is-warning:hover {
-  background-color: #ffeeba;
-}
-
-.notification-details {
-  font-size: 0.85rem;
-  color: #495057;
-  white-space: normal;
-  line-height: 1.3;
-  margin-top: 2px;
-}
-
-.notification-sub-details {
-  font-size: 0.75rem;
-  margin-top: 4px;
 }
 </style>

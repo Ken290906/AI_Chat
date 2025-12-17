@@ -63,7 +63,7 @@ Frontend được xây dựng bằng Vue.js 3, sử dụng Composition API và q
 4.  Chạy server: `npm start` hoặc `node server.js`
 
 ### Cài đặt Frontend
-1.  Di chuyển vào thư mục `my-app`: `cd my-app`
+1.  Di chuyển vào thư mục `my-app`: `cd my-app`np
 2.  Cài đặt các gói phụ thuộc: `npm install`
 3.  Chạy server phát triển: `npm run dev`
 4.  Mở trình duyệt và truy cập vào địa chỉ `http://localhost:5173` (hoặc cổng được chỉ định).
