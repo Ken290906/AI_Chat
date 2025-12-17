@@ -101,9 +101,21 @@ export default {
   },
   computed: {
     ...mapState(useMainStore, {
-      notifications: 'notifications', // Chỉ lấy notifications
-      unreadCount: 'unreadNotificationsCount'
+      // 1. Lấy và lọc danh sách thông báo hợp lệ
+      notifications: (state) => {
+        return state.notifications.filter(n => 
+          n.id !== undefined && 
+          n.id !== null && 
+          n.id !== 'undefined'
+        );
+      },
+      // 2. Không lấy trực tiếp từ store nữa mà tính toán dựa trên danh sách đã lọc ở trên
     }),
+    
+    // Thêm một computed property riêng để tính số lượng chưa đọc từ danh sách đã lọc
+    unreadCount() {
+      return this.notifications.filter(n => !n.is_read).length;
+    }
   },
   mounted() {
     this.loadEmployeeInfo();
