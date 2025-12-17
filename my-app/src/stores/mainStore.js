@@ -14,30 +14,10 @@ export const useMainStore = defineStore('main', {
 
   getters: {
     unreadNotificationsCount: (state) => {
-      // Đếm tổng số thông báo và cảnh báo chưa đọc
-      const unreadNotifications = state.notifications.filter(n => !n.is_read).length;
-      const unreadWarnings = state.warnings.filter(w => !w.is_read).length;
-      return unreadNotifications + unreadWarnings;
+      // Chỉ đếm thông báo chưa đọc
+      return state.notifications.filter(n => !n.is_read).length;
     },
-    // Getter đã được đơn giản hóa và tăng cường tính an toàn cho hàm sort
-    sortedCombinedNotifications(state) {
-      // Cả hai mảng giờ đều chứa các đối tượng đã được ánh xạ
-      const combined = [
-        ...state.notifications,
-        ...state.warnings
-      ];
-      // Sắp xếp tất cả theo thời gian, mới nhất lên đầu
-      return combined.sort((a, b) => {
-        const dateA = new Date(a.time);
-        const dateB = new Date(b.time);
-
-        // Xử lý trường hợp ngày không hợp lệ
-        if (isNaN(dateA.getTime())) return 1;
-        if (isNaN(dateB.getTime())) return -1;
-
-        return dateB - dateA;
-      });
-    }
+    // Xóa getter sortedCombinedNotifications
   },
 
   actions: {
