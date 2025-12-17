@@ -93,15 +93,16 @@ export class ChatService {
    * @param {string} [ghiChu] - Ghi chú tùy chọn
    * @returns {Promise<object>} Bản ghi CanhBao vừa được tạo
    */
-  static async createWarning(chatSessionId, clientId, tenCanhBao = "need support", ghiChu = null) {
+  static async createWarning(chatSessionId, clientId, tenCanhBao = "need support", ghiChu = null, maPhanLoai) {
     try {
       console.log(`Creating warning for chat: ${chatSessionId}, client: ${clientId}`);
       
+
       const canhBao = await db.CanhBao.create({
         TenCB: tenCanhBao,
-        MaPhanLoai: 1, // Giả sử 1 là "cần hỗ trợ"
+        MaPhanLoai: maPhanLoai, // Nhận giá trị cụ thể từ nơi gọi hàm
         GhiChu: ghiChu || `Khách ${clientId} cần hỗ trợ`,
-        MaPhienChat: chatSessionId, // LƯU LẠI PHIÊN CHAT (AI)
+        MaPhienChat: chatSessionId,
       });
 
       // Sau khi tạo, fetch lại bản ghi để có đầy đủ các include cần thiết cho frontend
