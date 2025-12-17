@@ -143,7 +143,8 @@ const AIService = {
         where: { MaPhienChat: chatSessionId },
         defaults: {
           NoiDungTomTat: summaryText,
-          KetQuaTuAI: "Đã xử lý" // Bạn có thể yêu cầu AI trích xuất trạng thái này riêng nếu muốn xịn hơn
+          KetQuaTuAI: "Đã xử lý", // Bạn có thể yêu cầu AI trích xuất trạng thái này riêng nếu muốn xịn hơn
+          ThoiGianTao: db.sequelize.literal('CURRENT_TIMESTAMP')
         }
       });
 
