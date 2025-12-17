@@ -10,6 +10,7 @@ router.get('/chat-summaries', async (req, res) => {
     // Lấy các tham số từ query string với giá trị mặc định
     const { page = 1, limit = 10, search = '', startDate, endDate } = req.query;
     const offset = (page - 1) * limit; // Tính vị trí bắt đầu
+    const Op = db.Sequelize.Op;
 
     // Đối tượng where để lọc dữ liệu
     const where = {};
@@ -22,14 +23,31 @@ router.get('/chat-summaries', async (req, res) => {
       ];
     }
 
-    if (startDate) {
-      // Lọc từ ngày bắt đầu (lớn hơn hoặc bằng)
-      where.ThoiGianTao = { ...where.ThoiGianTao, [db.Sequelize.Op.gte]: new Date(startDate) };
-    }
-    if (endDate) {
-      // Lọc đến ngày kết thúc (nhỏ hơn hoặc bằng)
-      where.ThoiGianTao = { ...where.ThoiGianTao, [db.Sequelize.Op.lte]: new Date(endDate) };
-    }
+    if (startDate || endDate) {
+  // Sử dụng mảng để chứa các điều kiện lọc theo ngày
+  const dateConditions = [];
+  
+  if (startDate) {
+    dateConditions.push(
+      db.sequelize.where(db.sequelize.fn('DATE', db.sequelize.col('ThoiGianTao')), '>=', startDate)
+    );
+  }
+  
+  if (endDate) {
+    dateConditions.push(
+      db.sequelize.where(db.sequelize.fn('DATE', db.sequelize.col('ThoiGianTao')), '<=', endDate)
+    );
+  }
+
+  // Kết hợp điều kiện ngày vào đối tượng where chính
+  if (where[Op.or]) {
+    // Nếu đã có điều kiện search (Op.or), dùng Op.and để kết hợp cả hai
+    where[Op.and] = dateConditions;
+  } else {
+    // Nếu không có search, gán trực tiếp mảng điều kiện vào Op.and
+    where[Op.and] = dateConditions;
+  }
+}
 
     // Truy vấn cơ sở dữ liệu
     const { count, rows } = await db.TomTatPhienChat.findAndCountAll({
