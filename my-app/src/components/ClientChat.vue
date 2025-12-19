@@ -389,13 +389,26 @@ export default {
         });
         this.scrollToBottom(true); // Cuộn xuống khi nhận phản hồi AI
       } catch (error) {
-        this.messages.push({ 
-          text: "❌ Lỗi khi gửi tin nhắn tới AI.", 
-          isUser: false,
-          timestamp: new Date()
-        });
-        this.scrollToBottom(true); // Cuộn xuống khi có lỗi AI
-        this.requestSupport("☠️ AI đang gặp sự cố kỹ thuật. Hệ thống đang kết nối bạn với nhân viên hỗ trợ...");
+        // ===== SỬA TẠI ĐÂY =====
+      this.messages.push({ 
+        text: "❌ Lỗi khi gửi tin nhắn tới AI.", 
+        isUser: false,
+        timestamp: new Date()
+      });
+
+      // Thay vì gọi this.requestSupport(...) -> cái này sẽ gửi socket gây trùng lặp
+      // Chúng ta chỉ cập nhật UI để khách biết là đang chờ nhân viên
+      this.isAdminChat = true;
+      this.isAwaitingAdmin = true;
+
+      this.messages.push({
+        text: "☠️ AI đang gặp sự cố kỹ thuật. Hệ thống đang kết nối bạn với nhân viên hỗ trợ...",
+        isUser: false,
+        id: 'connecting_message',
+        timestamp: new Date()
+      });
+      
+      this.scrollToBottom(true);
       } finally {
         this.isTyping = false;
       }

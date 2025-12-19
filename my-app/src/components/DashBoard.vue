@@ -179,13 +179,22 @@ const fetchData = async () => {
     // Xử lý Phân loại cảnh báo
     const warningTypeData = responses[5].data;
     const warningColors = ['#ffc107', '#17a2b8', '#28a745', '#dc3545'];
-    let offset = 0;
+    let accumulatedOffset = 0;
     warningTypes.value = warningTypeData.map((item, index) => {
-      const currentOffset = offset;
-      // Giả sử API warning-types đã trả về value là tỷ lệ phần trăm (để khớp với code cũ và hình ảnh)
-      offset += item.value;
+      // item.value hiện tại đang là số lượng (count) từ API
+      const count = item.value; 
+      const total = totalWarnings.value;
+      
+      // Tính tỷ lệ phần trăm thực tế
+      const percentage = total > 0 ? parseFloat(((count / total) * 100).toFixed(2)) : 0;
+      
+      const currentOffset = accumulatedOffset;
+      accumulatedOffset += percentage;
+
       return {
-        ...item,
+        name: item.name, // "Kỹ thuật" hoặc "Người dùng"
+        count: count,    // Lưu số lượng thực tế để hiển thị nếu cần
+        value: percentage, // Giá trị phần trăm để vẽ biểu đồ
         offset: currentOffset,
         color: warningColors[index % warningColors.length],
       };
