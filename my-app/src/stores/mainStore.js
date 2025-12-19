@@ -35,6 +35,7 @@ export const useMainStore = defineStore('main', {
         this.connectWebSocket();
         this.fetchNotifications();
         this.fetchWarnings(); // Gọi fetch warnings
+        this.fetchAllClients(); // Tải tất cả client khi khởi động
       } catch (error) {
         console.error('Error initializing store:', error);
         router.push('/login');
@@ -209,6 +210,20 @@ export const useMainStore = defineStore('main', {
     // =================================
     // CHAT & CLIENTS
     // =================================
+    async fetchAllClients() {
+      try {
+        const response = await axios.get("http://localhost:3000/api/auth/clients");
+        this.clients = response.data.map(client => ({
+          id: client.MaKH,
+          name: client.HoTen || `Khách ${client.MaKH}`,
+          sessionId: null // sessionId sẽ được cập nhật sau khi chấp nhận yêu cầu
+        }));
+        console.log("✅ [Store] Fetched all clients");
+      } catch (error) {
+        console.error("❌ [Store] Error fetching all clients:", error);
+      }
+    },
+
     async acceptRequest(notification) {
       await this.addOrUpdateClient(notification.clientId);
       if (this.ws) {

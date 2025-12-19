@@ -345,7 +345,7 @@ export default {
 
       this.promptCount++;
 
-      if (this.promptCount >= 3) {
+      if (this.promptCount >= 10) {
         // === BƯỚC QUAN TRỌNG: Gửi tin nhắn text xuống server trước ===
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
            this.ws.send(JSON.stringify({ 
@@ -356,7 +356,7 @@ export default {
         }
         // =============================================================
 
-        this.requestSupport("⚠️ AI đã gặp lỗi sau 3 lần thử. Hệ thống đang kết nối bạn với nhân viên hỗ trợ...");
+        this.requestSupport("⚠️ AI đang gặp sự cố. Hệ thống đang kết nối bạn với nhân viên hỗ trợ...");
         return; 
       }
 
