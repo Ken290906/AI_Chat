@@ -25,6 +25,24 @@ router.get('/client/:clientId', async (req, res) => {
   }
 });
 
+// Route để lấy tất cả khách hàng
+router.get('/clients', async (req, res) => {
+  try {
+    console.log('🔹 Getting all clients');
+    
+    const clients = await db.KhachHang.findAll({
+      attributes: ['MaKH', 'HoTen'],
+      order: [['HoTen', 'ASC']],
+    });
+    
+    console.log(`✅ Found ${clients.length} clients.`);
+    res.json(clients);
+  } catch (error) {
+    console.error('❌ Lỗi lấy tất cả khách hàng:', error);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
 // Route để lấy thông tin nhân viên theo ID
 router.get('/employee/:employeeId', async (req, res) => {
   try {

@@ -265,7 +265,7 @@
               </div>
               <div class="mb-3">
                 <label class="form-label text-muted small fw-bold text-uppercase">Mã Phiên</label>
-                <input type="number" class="form-control bg-light border-0" v-model="editingLog.MaPhienChat">
+                <input type="number" class="form-control bg-light border-0" v-model="editingLog.MaPhienChat" disabled>
               </div>
               <div class="mb-3">
                 <label class="form-label text-muted small fw-bold text-uppercase">Hành động</label>

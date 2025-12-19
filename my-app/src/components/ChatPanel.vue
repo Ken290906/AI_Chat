@@ -6,13 +6,13 @@
           <h5 class="mb-0 fw-bold">Hội thoại</h5>
           <div class="input-group mt-3">
             <span class="input-group-text bg-light border-0"><i class="bi bi-search"></i></span>
-            <input type="text" class="form-control bg-light border-0" placeholder="Tìm kiếm...">
+            <input type="text" v-model="searchQuery" class="form-control bg-light border-0" placeholder="Tìm kiếm...">
           </div>
         </div>
 
         <div class="list-group list-group-flush overflow-auto flex-grow-1">
           <a
-            v-for="client in clients"
+            v-for="client in filteredClients"
             :key="client.id"
             href="#"
             class="list-group-item list-group-item-action"
@@ -131,6 +131,7 @@ export default {
   },
   data() {
     return {
+      searchQuery: "",
       activeClient: null,
       allConversations: {}, 
       newMessage: "",
@@ -139,6 +140,16 @@ export default {
     };
   },
   computed: {
+    filteredClients() {
+      if (!this.searchQuery) {
+        return this.clients;
+      }
+      const lowerCaseQuery = this.searchQuery.toLowerCase();
+      return this.clients.filter(client => {
+        const clientName = (client.name || 'Khách mới').toLowerCase();
+        return clientName.includes(lowerCaseQuery);
+      });
+    },
     activeChatMessages() {
       if (!this.activeClient) return [];
       if (!this.allConversations[this.activeClient.id]) {

@@ -100,6 +100,8 @@ export class ChatService {
 
       const canhBao = await db.CanhBao.create({
         TenCB: tenCanhBao,
+
+        MaPhanLoai: 2, // Giả sử 1 là "cần hỗ trợ"
         MaPhanLoai: maPhanLoai, // Nhận giá trị cụ thể từ nơi gọi hàm
         GhiChu: ghiChu || `Khách ${clientId} cần hỗ trợ`,
         MaPhienChat: chatSessionId,
